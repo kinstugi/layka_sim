@@ -12,7 +12,10 @@ from models.world import World
 from views.world_view import WorldView
 from sim_exceptions.collision_exception import CollisionException
 from sim_exceptions.goal_reached_exception import GoalReachedException
+
+#custom imports
 from models.custom_robots.layka import Layka
+from models.custom_robots.kheperaIII import KheperaIII
 
 REFRESH_RATE = 20.0  # hertz
 
@@ -46,6 +49,7 @@ class Simulator:
         # create the robot
         # robot = Robot()
         robot = Layka()
+        # robot = KheperaIII()
         self.world.add_robot(robot)
 
         # generate a random environment
@@ -117,4 +121,5 @@ class Simulator:
 
 
 # RUN THE SIM:
-Simulator()
+if __name__ == "__main__":
+    Simulator()
