@@ -1,0 +1,2 @@
+class LaykaSupervisor:
+    pass
