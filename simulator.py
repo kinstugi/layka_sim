@@ -47,8 +47,8 @@ class Simulator:
         self.world = World(self.period)
 
         # create the robot
-        # robot = Layka()
-        robot = KheperaIII()
+        robot = Layka()
+        # robot = KheperaIII()
         self.world.add_robot(robot)
 
         # generate a random environment

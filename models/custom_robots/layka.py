@@ -11,15 +11,16 @@ class Layka(MobileRobot):
 
     # Layka outline
     LAYKA_OUTLINE = [
-        [0.000, 0.070],
-        [0.050, 0.050],
-        [0.070, 0.000],
-        [0.050, -0.050],
-        [0.000, -0.070],
-        [-0.050, -0.050],
-        [-0.070, 0.000],
-        [-0.050, 0.050],
+        [-0.050, 0.050],  # Left front diagonal
+        [0.000, 0.070],   # Front
+        [0.050, 0.050],   # Right front diagonal
+        [0.070, 0.000],   # Right side
+        [0.050, -0.050],  # Right rear diagonal
+        [0.000, -0.070],  # Rear
+        [-0.050, -0.050], # Left rear diagonal
+        [-0.070, 0.000],  # Left side
     ]
+
 
     LAYKA_SENSOR_MIN_RANGE = 0.01
     LAYKA_SENSOR_MAX_RANGE = 0.25
@@ -28,15 +29,26 @@ class Layka(MobileRobot):
     LAYKA_ANG_VEL_LIMIT = 2.2763  # rad/s
 
     LAYKA_SENSOR_POSES = [
-        [0.070, 0.000, 0],        # Right-middle, facing forward
-        [0.050, 0.050, 45],       # Front-right, diagonal
-        [0.000, 0.070, 90],       # Front-center, facing left
-        [-0.050, 0.050, 135],     # Front-left, diagonal
-        [-0.070, 0.000, 180],     # Left-middle, facing backward
-        [-0.050, -0.050, -135],   # Back-left, diagonal
-        [0.000, -0.070, -90],     # Back-center, facing right
-        [0.050, -0.050, -45],     # Back-right, diagonal
+        # [-0.050, 0.050, 135],  # Similar to [-0.038, 0.048, 128] (Front-left outward)
+        # [0.000, 0.070, 90],    # Similar to [0.019, 0.064, 75] (Front-left inward)
+        # [0.050, 0.050, 45],    # Similar to [0.050, 0.050, 42] (Front-left shallow inward)
+        # [0.070, 0.000, 0],     # Similar to [0.070, 0.017, 13] (Front-center)
+        # [0.050, -0.050, 315],  # Similar to [0.070, -0.017, -13] (Front-right shallow inward)
+        # [0.000, -0.070, 270],  # Similar to [0.019, -0.064, -75] (Front-right inward)
+        # [-0.050, -0.050, 225], # Similar to [-0.038, -0.048, -128] (Front-right outward)
+        # [-0.070, 0.000, 180],  # Similar to [-0.048, 0.000, 180] (Rear-center)
+        
+        [-0.038, 0.048, 128],  # x, y, theta (in degrees)
+        [0.019, 0.064, 75],
+        [0.050, 0.050, 42],
+        [0.070, 0.017, 13],
+        [0.070, -0.017, -13],
+        [0.050, -0.050, -42],
+        [0.019, -0.064, -75],
+        [-0.038, -0.048, -128],
+        [-0.048, 0.000, 180],
     ]
+
 
 
     def __init__(self):
@@ -49,5 +61,5 @@ class Layka(MobileRobot):
             sensor_poses = self.LAYKA_SENSOR_POSES, 
             sensor_min_range = self.LAYKA_SENSOR_MIN_RANGE, 
             sensor_max_range = self.LAYKA_SENSOR_MAX_RANGE, 
-            sensor_fov = 40, 
+            sensor_fov = 20, 
         )
