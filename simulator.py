@@ -16,6 +16,7 @@ from sim_exceptions.goal_reached_exception import GoalReachedException
 #custom imports
 from models.custom_robots.layka import Layka
 from models.custom_robots.kheperaIII import KheperaIII
+from models.custom_robots.test_robot import Testbot
 
 REFRESH_RATE = 20.0  # hertz
 
@@ -49,6 +50,7 @@ class Simulator:
         # create the robot
         robot = Layka()
         # robot = KheperaIII()
+        robot = Testbot()
         self.world.add_robot(robot)
 
         # generate a random environment
