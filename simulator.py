@@ -48,7 +48,7 @@ class Simulator:
 
         # create the robot
         robot = Layka()
-        robot = Testbot()
+        # robot = Testbot()
         self.world.add_robot(robot)
 
         # generate a random environment

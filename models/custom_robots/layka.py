@@ -9,29 +9,35 @@ class Layka(MobileRobot):
         WHEEL_TICKS_PER_REV = 2765
         MAX_WHEEL_DRIVE_RATE = 15.0  # rad/s
         ROBOT_OUTLINE = [
-            [-0.030, 0.080],  # Front-left
-            [0.040, 0.080],   # Front-right
-            [0.065, 0.050],   # Right side, closer to front
-            [0.080, 0.015],   # Right-middle
-            [0.080, -0.015],  # Right-middle, below the center
-            [0.065, -0.050],  # Right side, closer to rear
-            [0.040, -0.080],  # Rear-right
-            [-0.030, -0.080], # Rear-left
-            [-0.055, -0.050], # Left side, closer to rear
-            [-0.065, -0.015], # Left-middle
-            [-0.065, 0.015],  # Left-middle, above the center
-            [-0.055, 0.050],  # Left side, closer to front
+            [0.000, 0.070],
+            [0.050, 0.050],
+            [0.070, 0.000],
+            [0.050, -0.050],
+            [0.000, -0.070],
+            [-0.050, -0.050],
+            [-0.070, 0.000],
+            [-0.050, 0.050],
         ]
 
         SENSOR_MIN_RANGE = 0.02
-        SENSOR_MAX_RANGE = 0.3
+        SENSOR_MAX_RANGE = 0.2
 
         SENSOR_POSES = [
+            # , 225 degrees[-0.050, 0.05, 135],  
+            # [0.00, 0.070, 90],
+            # [0.050, 0.050, 45],
+            # [0.070, 0.00, 0],
+            # # [0.070, -0.017, -13],
+            # [0.050, -0.050, -45],
+            # [0.00, -0.070, -90],
+            # [-0.05, -0.05, -135],
+            # [-0.07, 0.000, 180], #Rear-left diagonal
+
             [-0.038, 0.048, 135],  
             [0.019, 0.064, 90],
             [0.050, 0.050, 45],
-            [0.070, 0.017, 0],
-            # [0.070, -0.017, -13],
+            [0.070, 0.0, 0],
+            [0.070, -0.017, -0],
             [0.050, -0.050, -45],
             [0.019, -0.064, -90],
             [-0.038, -0.048, -135],
