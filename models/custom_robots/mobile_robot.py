@@ -19,7 +19,8 @@ class MobileRobot:
                 sensor_max_range, 
                 sensor_fov, 
                 dynamics_class=DifferentialDriveDynamics, 
-                supervisor_class=Supervisor
+                supervisor=None,
+                initial_pose = [0.0, 0.0, 0.0]
             ):
         """
         Initializes a mobile robot with basic properties. 
@@ -48,7 +49,7 @@ class MobileRobot:
         self.max_wheel_drive_rate = max_wheel_drive_rate
 
         # pose
-        self.pose = Pose(0.0, 0.0, 0.0)
+        self.pose = Pose(initial_pose[0], initial_pose[1], initial_pose[2])
 
         # wheel encoders
         self.left_wheel_encoder = WheelEncoder(wheel_ticks_per_rev)
@@ -69,14 +70,18 @@ class MobileRobot:
         self.dynamics = dynamics_class(self.wheel_radius, self.wheel_base_length)
 
         # supervisor
-        self.supervisor = supervisor_class(
+        self.supervisor = Supervisor(
             RobotSupervisorInterface(self),  # interface to interact with robot
             self.wheel_radius,
             self.wheel_base_length,
             wheel_ticks_per_rev,
             sensor_poses,
             sensor_max_range,
+            initial_pose_args= initial_pose
         )
+        
+        if supervisor:
+            self.supervisor = supervisor
 
         # initial wheel drive rates
         self.left_wheel_drive_rate = 0.0
@@ -108,3 +113,14 @@ class MobileRobot:
 
         self.left_wheel_drive_rate = v_l
         self.right_wheel_drive_rate = v_r
+    
+    def set_initial_pose(self, x: float, y: float, theta: float):
+        """
+        Sets the initial pose of the robot.
+
+        Args:
+            x (float): Initial x-coordinate.
+            y (float): Initial y-coordinate.
+            theta (float): Initial orientation (in radians).
+        """
+        self.pose = Pose(x, y, theta)

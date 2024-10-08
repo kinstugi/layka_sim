@@ -6,6 +6,27 @@ from robot_control.control_state import ControlState
 
 
 class SupervisorView:
+    """
+    Represents the visual representation of a supervisor in the simulation.
+
+    Attributes:
+        viewer (Viewer): The graphical viewer object.
+        supervisor (Supervisor): The supervisor object being represented.
+        supervisor_state_machine (StateMachine): The supervisor's state machine.
+        go_to_goal_controller_view (GoToGoalControllerView): The view for the go-to-goal controller.
+        avoid_obstacles_controller_view (AvoidObstaclesControllerView): The view for the avoid-obstacles controller.
+        gtg_and_ao_controller_view (GTGAndAOControllerView): The view for the GTG and AO controller.
+        follow_wall_controller_view (FollowWallControllerView): The view for the follow-wall controller.
+        robot_geometry (Geometry): The geometry of the robot.
+        robot_estimated_traverse_path (list[Vector2]): A list of positions representing the robot's estimated traversed path.
+
+    Methods:
+        draw_supervisor_to_frame(): Draws the supervisor, its goal, and relevant controller information to the current frame.
+        _draw_goal_to_frame(): Draws the supervisor's goal to the current frame.
+        _draw_robot_state_estimate_to_frame(): Draws the supervisor's estimated robot state to the current frame.
+        _draw_current_controller_to_frame(): Draws the current controller's state to the current frame.
+        _draw_all_controllers_to_frame(): Draws all controllers' states to the current frame (for debugging).
+    """
     def __init__(self, viewer, supervisor, robot_geometry):
         self.viewer = viewer
         self.supervisor = supervisor

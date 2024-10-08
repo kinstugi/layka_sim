@@ -21,6 +21,17 @@ REFRESH_RATE = 20.0  # hertz
 
 
 class Simulator:
+    """
+    This class implements a robot simulator using GTK+ and custom robot classes.
+
+    It provides functionalities to:
+     - Create and manage the graphical user interface (GUI) for visualization.
+     - Load and manipulate the map environment for the simulation.
+     - Create and control robot instances with custom behaviors.
+     - Run the simulation loop, stepping through simulation ticks and updating the world state.
+     - Handle collisions and goal achievements during simulation.
+
+    """
     def __init__(self):
         # create the GUI
         self.viewer = gui.viewer.Viewer(self)
@@ -47,8 +58,10 @@ class Simulator:
         self.world = World(self.period)
 
         # create the robot
+        robot1 = Layka(initial_pose=[-0.1, -0.5, 0])
         robot = Layka()
-        # robot = Testbot()
+
+        self.world.add_robot(robot1)
         self.world.add_robot(robot)
 
         # generate a random environment
@@ -62,6 +75,7 @@ class Simulator:
 
         # render the initial world
         self.draw_world()
+        
 
     def play_sim(self):
         GLib.source_remove(

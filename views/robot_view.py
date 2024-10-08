@@ -15,6 +15,21 @@ K3_TOP_PLATE = [
 
 
 class RobotView:
+    """
+    Represents the visual representation of a robot in the simulation.
+
+    Attributes:
+        viewer (Viewer): The graphical viewer object.
+        robot (Robot): The robot object being represented.
+        supervisor_view (SupervisorView): The view for the robot's supervisor.
+        ir_sensor_views (list[ProximitySensorView]): List of views for the robot's IR sensors.
+        traverse_path (list[Vector2]): A list of positions representing the robot's traversed path.
+
+    Methods:
+        draw_robot_to_frame(): Draws the robot, its supervisor, and its IR sensors to the current frame.
+        _draw_traverse_path_to_frame(): Draws the robot's traverse path to the current frame.
+        _draw_rich_traverse_path_to_frame(): Draws the robot's traverse path with varying dot sizes and alpha values based on speed.
+    """
     def __init__(self, viewer, robot):
         self.viewer = viewer
         self.robot = robot

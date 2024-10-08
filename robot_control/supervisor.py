@@ -14,6 +14,45 @@ K3_ANG_VEL_LIMIT = 2.2763  # rad/s
 
 
 class Supervisor:
+    """
+    Represents the supervisor entity that controls the robot.
+
+    Attributes:
+        time (float): The internal clock time in seconds.
+        robot (RobotInterface): The interface to interact with the robot.
+        proximity_sensor_placements (list[Pose]): The placement poses of the proximity sensors.
+        proximity_sensor_max_range (float): The maximum detection range of the proximity sensors.
+        robot_wheel_radius (float): The radius of a drive wheel.
+        robot_wheel_base_length (float): The robot's wheel base length.
+        wheel_encoder_ticks_per_revolution (int): The number of wheel encoder ticks per revolution.
+        prev_ticks_left (int): The previous left wheel encoder ticks.
+        prev_ticks_right (int): The previous right wheel encoder ticks.
+        go_to_angle_controller (GoToAngleController): The go-to-angle controller.
+        go_to_goal_controller (GoToGoalController): The go-to-goal controller.
+        avoid_obstacles_controller (AvoidObstaclesController): The avoid-obstacles controller.
+        gtg_and_ao_controller (GTGAndAOController): The GTG and AO controller.
+        follow_wall_controller (FollowWallController): The follow-wall controller.
+        state_machine (SupervisorStateMachine): The supervisor's state machine.
+        proximity_sensor_distances (list[float]): The distances measured by the proximity sensors.
+        estimated_pose (Pose): The estimated pose of the robot.
+        current_controller (SupervisorControllerInterface): The current active controller.
+        goal (list[float]): The target goal for the robot.
+        v_max (float): The maximum translational velocity.
+        omega_max (float): The maximum angular velocity.
+        v_output (float): The output translational velocity.
+        omega_output (float): The output angular velocity.
+
+    Methods:
+        step(dt): Simulates the supervisor running for one time increment.
+        execute(): Executes one control loop.
+        _update_state(): Updates the estimated robot state and control state.
+        _update_controller_headings(): Updates the heading vectors for active controllers.
+        _update_proximity_sensor_distances(): Updates the proximity sensor distances.
+        _update_odometry(): Updates the estimated robot pose using wheel encoder readings.
+        _send_robot_commands(): Sends the control outputs to the robot.
+        _uni_to_diff(v, omega): Converts unicycle-style velocity and angular velocity to differential wheel velocities.
+        _diff_to_uni(v_l, v_r): Converts differential wheel velocities to unicycle-style velocity and angular velocity.
+    """
     def __init__(
         self,
         robot_interface,  # the interface through which this supervisor will interact with the robot
@@ -28,7 +67,7 @@ class Supervisor:
 
         # internal clock time in seconds
         self.time = 0.0
-
+        
         # robot representation
         # NOTE: the supervisor does NOT have access to the physical robot, only the
         # robot's interface

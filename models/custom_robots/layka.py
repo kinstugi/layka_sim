@@ -1,9 +1,14 @@
 from models.custom_robots.mobile_robot import MobileRobot
 from models.differential_drive_dynamics import DifferentialDriveDynamics
+from robot_control.supervisor import Supervisor
 
 
 class Layka(MobileRobot):
-    def __init__(self) -> None:
+    def __init__(
+            self, 
+            supervisor=Supervisor, 
+            initial_pose = [0.0, 0.0, 0]
+        ) -> None:
         WHEEL_RADIUS = 0.021  # meters
         WHEEL_BASE_LENGTH = 0.0885  # meters
         WHEEL_TICKS_PER_REV = 2765
@@ -53,5 +58,6 @@ class Layka(MobileRobot):
             sensor_max_range= SENSOR_MAX_RANGE,
             sensor_fov= 40,
             bottom_plate=ROBOT_OUTLINE,
-            sensor_poses= SENSOR_POSES
+            sensor_poses= SENSOR_POSES,
+            initial_pose=initial_pose
         )

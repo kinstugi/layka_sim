@@ -6,6 +6,20 @@ MAJOR_GRIDLINE_SUBDIVISIONS = 5  # minor gridlines for every major gridline
 
 
 class WorldView:
+    """
+    Manages the visual representation of a simulated world.
+
+    Attributes:
+        viewer (Viewer): The graphical viewer object.
+        robot_views (list[RobotView]): List of robot views.
+        obstacle_views (list[ObstacleView]): List of obstacle views.
+
+    Methods:
+        __init__(world, viewer): Initializes the WorldView.
+        add_robot(robot): Adds a robot to the world.
+        add_obstacle(obstacle): Adds an obstacle to the world.
+        draw_world_to_frame(): Draws the entire world to the current frame.
+    """
     def __init__(self, world, viewer):
         # bind the viewer
         self.viewer = viewer
