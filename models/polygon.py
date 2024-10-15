@@ -1,15 +1,20 @@
 from utils import linalg2_util as linalg
 from models.geometry import Geometry
+import enum
 
+class PolygonType(enum.Enum):
+    OBSTACLE = 1
+    ROBOT = 2
 
 class Polygon(Geometry):
-    def __init__(self, vertices):
+    def __init__(self, vertices, polygon_type: PolygonType = PolygonType.OBSTACLE):
         self.vertices = vertices  # a list of 2-dimensional vectors
 
         # define the centerpoint and radius of a circle containing this polygon
         # value is a tuple of the form ( [ cx, cy ], r )
         # NOTE: this may not be the "minimum bounding circle"
         self.bounding_circle = self._bounding_circle()
+        self.polygon_type = polygon_type
 
     # return a copy of this polygon transformed to the given pose
     def get_transformation_to_pose(self, pose):

@@ -1,6 +1,6 @@
 from math import radians
 from models.differential_drive_dynamics import DifferentialDriveDynamics
-from models.polygon import Polygon
+from models.polygon import Polygon, PolygonType
 from models.pose import Pose
 from models.proximity_sensor import ProximitySensor
 from models.wheel_encoder import WheelEncoder
@@ -40,8 +40,9 @@ class MobileRobot:
         - supervisor_class: Supervisor class to manage high-level control (default: Supervisor).
         """
         # geometry
-        self.geometry = Polygon(bottom_plate)
-        self.global_geometry = Polygon(bottom_plate)
+        self.geometry = Polygon(bottom_plate, polygon_type=PolygonType.ROBOT)
+        self.global_geometry = Polygon(bottom_plate, polygon_type= PolygonType.ROBOT)
+        
 
         # wheel arrangement
         self.wheel_radius = wheel_radius

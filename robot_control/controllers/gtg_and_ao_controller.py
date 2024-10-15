@@ -5,6 +5,36 @@ from robot_control.controllers.go_to_goal_controller import GoToGoalController
 
 
 class GTGAndAOController:
+    """
+    This class implements a controller that combines a Go-To-Goal (GTG) controller
+    and an Avoid-Obstacle (AO) controller for a robot. The controller blends the heading
+    vectors from both controllers with a user-defined weight to navigate towards a 
+    goal while avoiding obstacles.
+
+    **Attributes:**
+    * supervisor (Webots.Supervisor): Reference to the Webots supervisor object for interacting with the robot simulator.
+    * go_to_goal_controller (GoToGoalController): Instance of the GoToGoalController class.
+    * avoid_obstacles_controller (AvoidObstaclesController): Instance of the AvoidObstaclesController class.
+    * sensor_gains (list[float]): Weights for the AO controller based on sensor angle.
+    * alpha (float): Weight for blending GTG and AO heading vectors (0 to 1).
+    * kP (float): Proportional control gain.
+    * kI (float): Integral control gain.
+    * kD (float): Derivative control gain.
+    * prev_time (float): Time of the previous control iteration.
+    * prev_eP (float): Previous proportional error.
+    * prev_eI (float): Previous integral error.
+    * gtg_heading_vector (list[float]): Heading vector calculated by the GTG controller.
+    * ao_heading_vector (list[float]): Heading vector calculated by the AO controller.
+    * obstacle_vectors (list[list[float]]): List of obstacle vectors calculated by the AO controller.
+    * blended_heading_vector (list[float]): Blended heading vector for robot movement.
+
+    **Methods:**
+    * __init__(self, supervisor): Constructor to initialize the controller.
+    * update_heading(self): Updates the blended heading vector based on GTG and AO controllers.
+    * execute(self): Calculates the desired robot velocity based on the blended heading vector.
+    * _print_vars(self, eP, eI, eD, v, omega): Prints debugging information about control 
+                                                variables (optional).
+    """
     def __init__(self, supervisor):
         # bind the supervisor
         self.supervisor = supervisor

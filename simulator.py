@@ -16,6 +16,7 @@ from sim_exceptions.goal_reached_exception import GoalReachedException
 #custom imports
 from models.custom_robots.layka import Layka
 from models.custom_robots.test_robot import Testbot
+from utils.math_util import generate_random_points
 
 REFRESH_RATE = 20.0  # hertz
 
@@ -57,12 +58,11 @@ class Simulator:
         # create the simulation world
         self.world = World(self.period)
 
-        # create the robot
-        robot1 = Layka(initial_pose=[-0.1, -0.5, 0])
-        robot = Layka()
+        # create the robots
+        robots = [Layka(initial_pose=pose) for pose in generate_random_points(1)]
 
-        self.world.add_robot(robot1)
-        self.world.add_robot(robot)
+        for robot in robots:
+            self.world.add_robot(robot)
 
         # generate a random environment
         if random:
