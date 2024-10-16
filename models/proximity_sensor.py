@@ -45,6 +45,7 @@ class ProximitySensor(Sensor):
 
         # sensor output
         self.read_value = MIN_READ_VALUE
+        self.detecting_robot = False
 
     # set this proximity sensor to detect an object at distance ( delta * max_range )
     def detect(self, delta):

@@ -41,6 +41,7 @@ class Physics:
             for sensor in sensors:
                 dmin = float("inf")
                 detector_line = sensor.detector_line
+                robot_detected = False
 
                 for solid in solids:
 
@@ -62,6 +63,8 @@ class Physics:
 
                             if intersection_exists and d < dmin:
                                 dmin = d
+                                if solid.__str__() == "robot":
+                                    robot_detected = True
 
                 # if there is an intersection, update the sensor with the new delta
                 # value
@@ -69,3 +72,4 @@ class Physics:
                     sensor.detect(dmin)
                 else:
                     sensor.detect(None)
+                sensor.detecting_robot = robot_detected

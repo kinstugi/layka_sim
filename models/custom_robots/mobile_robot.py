@@ -125,3 +125,6 @@ class MobileRobot:
             theta (float): Initial orientation (in radians).
         """
         self.pose = Pose(x, y, theta)
+    
+    def __str__(self) -> str:
+        return "robot"

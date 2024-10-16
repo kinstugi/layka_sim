@@ -26,16 +26,22 @@ class ProximitySensorView:
             sensor_cone_poly, sensor_theta, sensor_pos
         )
 
-        # shade the sensor cone according to positive detection
+        # Decide the color based on robot detection
         if self.proximity_sensor.target_delta is not None:
             alpha = 0.9 - 0.8 * self.proximity_sensor.target_delta
+
+            # Change color to green if detecting another robot
+            if self.proximity_sensor.detecting_robot:
+                color = "green"
+            else:
+                color = "red"
         else:
             alpha = 0.1
+            color = "red"  # Default color if no object is detected
 
-        # add the sensor cone to the frame
-        self.viewer.current_frame.add_polygons(
-            [sensor_cone_poly], color="red", alpha=alpha
-        )
+        # add the sensor cone to the frame with the selected color
+        self.viewer.current_frame.add_polygons([sensor_cone_poly], color=color, alpha=alpha)
+
 
         # === FOR DEBUGGING: ===
         # self._draw_detector_line_to_frame()
