@@ -26,10 +26,17 @@ class BehaviorStateMachine:
             self.execute_state_depart_swarm()
         elif self.current_state == ControlState.AVOID_OBSTACLES:
             self.execute_state_avoid_obstacle()
-            
+
 
     def execute_state_search_for_robot(self):
-        pass
+        if self.condition_at_obstacle():
+            pass
+        elif self.condition_robots_nearby():
+            self.transition_to_wait_state()
+        elif self.condition_no_robots_nearby():
+            self.transition_to_search_state()
+        else:
+            raise("Error state")
 
     def execute_state_avoid_obstacle(self):
         pass
@@ -67,3 +74,19 @@ class BehaviorStateMachine:
         self.current_state = ControlState.SLIDE_RIGHT
         # maybe get best distance to goal but there is no goal
         self.supervisor.current_controller = self.supervisor.follow_wall_controller
+    
+    # conditions for the robot
+    def condition_no_robots_nearby(self):
+        return False
+
+    def condition_robots_nearby(self):
+        return False
+    
+    def condition_at_obstacle(self):
+        pass
+
+    def condition_at_slide_left(self):
+        pass
+
+    def condition_at_slide_right(self):
+        pass
