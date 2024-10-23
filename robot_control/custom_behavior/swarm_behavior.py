@@ -1,6 +1,7 @@
 from math import pi, log, sin, cos, radians
 from models.pose import Pose
 from robot_control.controllers.depart_swarm_controller import DepartSwarmController
+from robot_control.controllers.follow_wall_controller import FollowWallController
 from robot_control.controllers.search_robots_controller import SearchRobotsController
 from robot_control.controllers.wait_swarm_controller import WaitSwarmController
 from robot_control.custom_behavior.behavior_controller_interface import BehaviorControllerInterface
@@ -44,6 +45,7 @@ class SwarmBehavior:
         self.search_robots_controller = SearchRobotsController(controller_interface)
         self.wait_swarm_controller = WaitSwarmController(controller_interface)
         self.depart_swarm_controller = DepartSwarmController(controller_interface)
+        self.follow_wall_controller = FollowWallController(controller_interface)
 
         # state machine
         self.state_machine = BehaviorStateMachine(self)

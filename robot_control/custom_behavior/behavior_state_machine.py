@@ -1,4 +1,5 @@
 # event parameters
+from robot_control.control_state import ControlState
 from robot_control.custom_behavior.swarm_behavior import SwarmBehavior
 
 
@@ -17,14 +18,52 @@ class BehaviorStateMachine:
         self.transition_to_search_state()
     
     def update_state(self):
+        if self.current_state == ControlState.SEARCH_ROBOTS:
+            self.execute_state_search_for_robot()
+        elif self.current_state == ControlState.WAIT_IN_SWARM:
+            self.execute_state_wait_in_swarm()
+        elif self.current_state == ControlState.DEPART_SWARM:
+            self.execute_state_depart_swarm()
+        elif self.current_state == ControlState.AVOID_OBSTACLES:
+            self.execute_state_avoid_obstacle()
+            
+
+    def execute_state_search_for_robot(self):
         pass
 
+    def execute_state_avoid_obstacle(self):
+        pass
+
+    def execute_state_wait_in_swarm(self):
+        pass
+
+    def execute_state_depart_swarm(self):
+        pass
+
+    def execute_state_slide_left(self):
+        pass
+
+    def execute_state_slide_right(self):
+        pass
 
     def transition_to_search_state(self):
-        pass
+        self.current_state = ControlState.SEARCH_ROBOTS
+        self.supervisor.current_controller = self.supervisor.search_robots_controller
 
     def transition_to_wait_state(self):
-        pass
+        self.current_state = ControlState.WAIT_IN_SWARM
+        self.supervisor.current_controller = self.supervisor.wait_swarm_controller
 
     def transition_to_depart_swarm_state(self):
-        pass
+        self.current_state = ControlState.DEPART_SWARM
+        self.supervisor.current_controller = self.supervisor.depart_swarm_controller
+    
+    def transition_to_slide_left_state(self):
+        self.current_state = ControlState.SLIDE_LEFT
+        # maybe get best distance to goal but there is no goal
+        self.supervisor.current_controller = self.supervisor.follow_wall_controller
+
+    def transition_to_slide_right_state(self):
+        self.current_state = ControlState.SLIDE_RIGHT
+        # maybe get best distance to goal but there is no goal
+        self.supervisor.current_controller = self.supervisor.follow_wall_controller
