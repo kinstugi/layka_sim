@@ -59,7 +59,7 @@ class Simulator:
         self.world = World(self.period)
 
         # create the robots
-        robots = [Layka(initial_pose=pose) for pose in generate_random_points(4)]
+        robots = [Layka(initial_pose=pose) for pose in generate_random_points(12)]
 
         for robot in robots:
             self.world.add_robot(robot)
