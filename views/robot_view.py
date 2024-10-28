@@ -1,4 +1,5 @@
 import utils.linalg2_util as linalg
+from views.bounce_behavior_view import BounceBehaviorView
 from views.proximity_sensor_view import ProximitySensorView
 from views.supervisor_view import SupervisorView
 
@@ -35,7 +36,7 @@ class RobotView:
         self.robot = robot
 
         # add the supervisor views for this robot
-        self.supervisor_view = SupervisorView(viewer, robot.supervisor, robot.geometry)
+        self.supervisor_view = BounceBehaviorView(viewer, robot.supervisor, robot.geometry)
 
         # add the IR sensor views for this robot
         self.ir_sensor_views = []

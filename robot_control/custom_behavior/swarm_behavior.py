@@ -2,10 +2,12 @@ from math import pi, log, sin, cos, radians
 from models.pose import Pose
 from robot_control.controllers.depart_swarm_controller import DepartSwarmController
 from robot_control.controllers.follow_wall_controller import FollowWallController
+from robot_control.controllers.forward_controller import ForwardController
+from robot_control.controllers.go_to_angle_controller import GoToAngleController
 from robot_control.controllers.search_robots_controller import SearchRobotsController
 from robot_control.controllers.wait_swarm_controller import WaitSwarmController
 from robot_control.custom_behavior.behavior_controller_interface import BehaviorControllerInterface
-from robot_control.custom_behavior.behavior_state_machine import BehaviorStateMachine
+from robot_control.custom_behavior.bounce_state_machine import BounceStateMachine
 
 # control parameters
 K3_TRANS_VEL_LIMIT = 0.3148  # m/s
@@ -21,7 +23,7 @@ class SwarmBehavior:
             sensor_placements,  # placement pose of the sensors on the robot body
             sensor_range,  # max detection range of the sensors
             initial_pose_args=[0.0, 0.0, 0.0],
-        ) -> None:
+        ) -> None: 
         
         self.time = 0.0
 
@@ -46,14 +48,17 @@ class SwarmBehavior:
         self.wait_swarm_controller = WaitSwarmController(controller_interface)
         self.depart_swarm_controller = DepartSwarmController(controller_interface)
         self.follow_wall_controller = FollowWallController(controller_interface)
+        self.forward_controller = ForwardController(controller_interface)
+        self.go_to_angle_controller = GoToAngleController(controller_interface)
 
         # state machine
-        self.state_machine = BehaviorStateMachine(self)
+        # self.state_machine = BehaviorStateMachine(self)
+        self.state_machine = BounceStateMachine(self)
 
         #state
         self.proximity_sensor_distances = [0.0, 0.0] * len(sensor_placements)
         self.estimated_pose = Pose(*initial_pose_args)
-        self.current_controller = self.search_robots_controller
+        self.current_controller = self.forward_controller
 
                 # control bounds
         self.v_max = K3_TRANS_VEL_LIMIT
@@ -61,7 +66,7 @@ class SwarmBehavior:
 
         # CONTROL OUTPUTS - UNICYCLE
         self.v_output = 0.0
-        self.omega_output = 0.0
+        self.omega_output = 0.0 
     
     def step(self, dt):
         self.time += dt

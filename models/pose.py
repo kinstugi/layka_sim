@@ -59,6 +59,10 @@ class Pose:
         self.x = x
         self.y = y
         self.theta = math_util.normalize_angle(theta)
+    
+    def update_theta(self, theta):
+        print(f"changing {self.theta}.......................{theta}")
+        self.theta = theta
 
     # return the constituents of this pose with location as a vector
     def vunpack(self):
@@ -71,3 +75,6 @@ class Pose:
     # return the position component of this pose as a vector
     def vposition(self):
         return [self.x, self.y]
+
+    def __str__(self):
+        return f"X = {self.x} \t Y = {self.y} \t theta = {self.theta}"

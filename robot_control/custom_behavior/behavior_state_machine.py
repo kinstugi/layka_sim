@@ -1,6 +1,6 @@
 # event parameters
 from robot_control.control_state import ControlState
-from robot_control.custom_behavior.swarm_behavior import SwarmBehavior
+# from robot_control.custom_behavior.swarm_behavior import SwarmBehavior
 
 
 D_STOP = 0.05  # meters from goal
@@ -11,7 +11,7 @@ D_DANGER = 0.04  # meters from obstacle
 PROGRESS_EPSILON = 0.05
 
 class BehaviorStateMachine:
-    def __init__(self, supervisor: SwarmBehavior) -> None:
+    def __init__(self, supervisor) -> None:
         self.supervisor = supervisor
 
         #set the initial state

@@ -4,6 +4,8 @@ from models.polygon import Polygon, PolygonType
 from models.pose import Pose
 from models.proximity_sensor import ProximitySensor
 from models.wheel_encoder import WheelEncoder
+from robot_control.custom_behavior.behavior_controller_interface import BehaviorControllerInterface
+from robot_control.custom_behavior.swarm_behavior import SwarmBehavior
 from robot_control.robot_supervisor_interface import RobotSupervisorInterface
 from robot_control.supervisor import Supervisor
 
@@ -71,7 +73,7 @@ class MobileRobot:
         self.dynamics = dynamics_class(self.wheel_radius, self.wheel_base_length)
 
         # supervisor
-        self.supervisor = Supervisor(
+        self.supervisor = SwarmBehavior(
             RobotSupervisorInterface(self),  # interface to interact with robot
             self.wheel_radius,
             self.wheel_base_length,

@@ -11,3 +11,5 @@ class ControlState:
     SEARCH_ROBOTS = 6
     WAIT_IN_SWARM = 7
     DEPART_SWARM = 8
+    FORWARD = 9
+    BOUNCE = 10
