@@ -72,7 +72,7 @@ class MobileRobot:
         # dynamics
         self.dynamics = dynamics_class(self.wheel_radius, self.wheel_base_length)
 
-        # supervisor
+        # supervisor (this where i set default behavior, initial it was go to goal)
         self.supervisor = SwarmBehavior(
             RobotSupervisorInterface(self),  # interface to interact with robot
             self.wheel_radius,

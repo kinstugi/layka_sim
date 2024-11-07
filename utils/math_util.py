@@ -16,7 +16,7 @@ def frange(x, y, jump=1.0):
     return r
 
 
-def generate_random_points(num_points):
+def generate_random_robot_poses(num_points):
     """Generates a list of random points with x, y coordinates and radian angles.
 
     Args:
