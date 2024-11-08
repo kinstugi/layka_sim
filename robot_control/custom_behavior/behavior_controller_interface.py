@@ -40,3 +40,6 @@ class BehaviorControllerInterface:
     def set_outputs(self, v, omega):
         self.supervisor.v_output = v
         self.supervisor.omega_output = omega
+
+    def get_target_orientation(self):
+        return self.supervisor.target_orientation

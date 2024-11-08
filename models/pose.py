@@ -61,7 +61,7 @@ class Pose:
         self.theta = math_util.normalize_angle(theta)
     
     def update_theta(self, theta):
-        print(f"changing {self.theta}.......................{theta}")
+        # print(f"changing {self.theta}.......................{theta}")
         self.theta = theta
 
     # return the constituents of this pose with location as a vector

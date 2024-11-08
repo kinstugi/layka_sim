@@ -23,9 +23,12 @@ class SwarmBehavior:
             sensor_placements,  # placement pose of the sensors on the robot body
             sensor_range,  # max detection range of the sensors
             initial_pose_args=[0.0, 0.0, 0.0],
+            target_orientation = 0.0
         ) -> None: 
         
         self.time = 0.0
+        
+        self.target_orientation = radians(180)
 
         self.robot = robot_interface
 

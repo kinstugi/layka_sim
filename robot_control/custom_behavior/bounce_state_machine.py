@@ -1,5 +1,6 @@
 from robot_control.control_state import ControlState
 from utils import linalg2_util as linalg
+from math import radians
 
 # Distance thresholds for obstacle detection
 D_CAUTION = 0.15  # meters from obstacle
@@ -39,7 +40,7 @@ class BounceStateMachine:
     def transition_to_state_bounce(self):
         self.current_state = ControlState.BOUNCE
         self._reflect_heading()
-        self.supervisor.current_controller = self.supervisor.forward_controller
+        self.supervisor.current_controller = self.supervisor.go_to_angle_controller
 
     # === CONDITIONS ===
     def condition_danger(self):
@@ -54,9 +55,13 @@ class BounceStateMachine:
     def _reflect_heading(self):
         # Reflect the current heading based on detected obstacle
         current_heading = self.supervisor.estimated_pose.theta
+        # if 0 <= current_heading <= radians(90) or radians(270) < current_heading <= radians(360):
+        #     self.supervisor.target_orientation = radians(180)
+        # elif radians(90) < current_heading <= radians(180) or radians(180) <= current_heading < radians(270):
+        #     self.supervisor.target_orientation = radians(0)
         # Reflect heading by adding 180 degrees (pi radians) to change direction
         new_heading = (current_heading + 3.14159) % (2 * 3.14159)
-        self.supervisor.estimated_pose.update_theta(new_heading)
+        self.supervisor.target_orientation = new_heading
 
     # === FOR DEBUGGING ===
     def _print_debug_info(self):
