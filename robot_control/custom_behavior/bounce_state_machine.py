@@ -55,11 +55,6 @@ class BounceStateMachine:
     def _reflect_heading(self):
         # Reflect the current heading based on detected obstacle
         current_heading = self.supervisor.estimated_pose.theta
-        # if 0 <= current_heading <= radians(90) or radians(270) < current_heading <= radians(360):
-        #     self.supervisor.target_orientation = radians(180)
-        # elif radians(90) < current_heading <= radians(180) or radians(180) <= current_heading < radians(270):
-        #     self.supervisor.target_orientation = radians(0)
-        # Reflect heading by adding 180 degrees (pi radians) to change direction
         new_heading = (current_heading + 3.14159) % (2 * 3.14159)
         self.supervisor.target_orientation = new_heading
 

@@ -10,7 +10,6 @@ class GoToAngleController:
         self.k_p = 5.0
 
     def execute(self, theta_d = None):
-        print("............. executing")
         if not theta_d:
             theta_d = self.supervisor.get_target_orientation()
             
