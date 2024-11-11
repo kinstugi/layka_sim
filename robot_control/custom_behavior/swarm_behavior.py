@@ -4,7 +4,7 @@ from robot_control.controllers.depart_swarm_controller import DepartSwarmControl
 from robot_control.controllers.follow_wall_controller import FollowWallController
 from robot_control.controllers.forward_controller import ForwardController
 from robot_control.controllers.go_to_angle_controller import GoToAngleController
-from robot_control.controllers.search_robots_controller import SearchRobotsController
+# from robot_control.controllers.search_robots_controller import SearchRobotsController
 from robot_control.controllers.wait_swarm_controller import WaitSwarmController
 from robot_control.custom_behavior.behavior_controller_interface import BehaviorControllerInterface
 from robot_control.custom_behavior.bounce_state_machine import BounceStateMachine
@@ -47,7 +47,7 @@ class SwarmBehavior:
 
         # controllers
         controller_interface = BehaviorControllerInterface(self)
-        self.search_robots_controller = SearchRobotsController(controller_interface)
+        # self.search_robots_controller = SearchRobotsController(controller_interface) # no need for this controller we have created the forward and angle which does the same thing
         self.wait_swarm_controller = WaitSwarmController(controller_interface)
         self.depart_swarm_controller = DepartSwarmController(controller_interface)
         self.follow_wall_controller = FollowWallController(controller_interface)
@@ -95,7 +95,7 @@ class SwarmBehavior:
     # calculate updated heading vectors for the active controllers
     def _update_controller_headings(self):
         self.wait_swarm_controller.update_heading()
-        self.search_robots_controller.update_heading()
+        # self.search_robots_controller.update_heading()
         self.depart_swarm_controller.update_heading()
 
     def _update_proximity_sensor_distances(self):
