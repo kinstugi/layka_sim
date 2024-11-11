@@ -60,6 +60,7 @@ class SwarmBehavior:
 
         #state
         self.proximity_sensor_distances = [0.0, 0.0] * len(sensor_placements)
+        self.robot_detection_sensor_array = [False] * len(sensor_placements) # this will tell us which sensor is detecting another robot
         self.estimated_pose = Pose(*initial_pose_args)
         self.current_controller = self.forward_controller
 
@@ -101,6 +102,9 @@ class SwarmBehavior:
         self.proximity_sensor_distances = [
             0.02 - (log(readval / 3960.0)) / 30.0
             for readval in self.robot.read_proximity_sensors()
+        ]
+        self.robot_detection_sensor_array = [
+            v for v in self.robot.read_robot_detection_array()
         ]
 
     # update the estimated position of the robot using it's wheel encoder readings

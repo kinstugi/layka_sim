@@ -14,3 +14,7 @@ class RobotSupervisorInterface:
     # apply wheel drive command
     def set_wheel_drive_rates(self, v_l, v_r):
         self.robot.set_wheel_drive_rates(v_l, v_r)
+    
+    #read the sensors to check if they're sensing another robot
+    def read_robot_detection_array(self):
+        return [s.detecting_robot for s in self.robot.ir_sensors]

@@ -25,7 +25,11 @@ class BounceStateMachine:
     def execute_state_forward(self):
         # If a danger condition is detected, transition to bounce state
         if self.condition_danger():
-            self.transition_to_state_bounce()
+            if not self.condition_robot_nearby():
+                self.transition_to_state_bounce()
+            else:
+                ## for now
+                self.transition_to_state_bounce()
 
     def execute_state_bounce(self):
         # Once the danger condition is resolved, return to forward movement
@@ -46,6 +50,9 @@ class BounceStateMachine:
     def condition_danger(self):
         # Check if any forward sensors detect an obstacle within the danger range
         return any(d < D_DANGER for d in self._forward_sensor_distances())
+
+    def condition_robot_nearby(self):
+        return any(self.supervisor.robot_detection_sensor_array)
 
     # === HELPER METHODS ===
     def _forward_sensor_distances(self):
