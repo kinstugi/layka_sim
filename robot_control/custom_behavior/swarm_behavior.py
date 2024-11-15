@@ -28,7 +28,9 @@ class SwarmBehavior:
         
         self.time = 0.0
         
+        # these are variables for swarm behavior
         self.target_orientation = radians(180)
+        self.rank = 0
 
         self.robot = robot_interface
 

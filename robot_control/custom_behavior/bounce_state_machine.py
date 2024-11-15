@@ -18,6 +18,10 @@ class BounceStateMachine:
             self.execute_state_forward()
         elif self.current_state == ControlState.BOUNCE:
             self.execute_state_bounce()
+        elif self.current_state == ControlState.WAIT_IN_SWARM:
+            self.execute_state_wait_swarm()
+        elif self.current_state == ControlState.DEPART_SWARM:
+            self.execute_state_depart_swarm()
         else:
             raise Exception("Undefined state")
 
@@ -29,12 +33,18 @@ class BounceStateMachine:
                 self.transition_to_state_bounce()
             else:
                 ## for now
-                self.transition_to_state_bounce()
+                self.transition_to_state_wait()
 
     def execute_state_bounce(self):
         # Once the danger condition is resolved, return to forward movement
         if not self.condition_danger():
             self.transition_to_state_forward()
+    
+    def execute_state_wait_swarm(self):
+        pass
+
+    def execute_state_depart_swarm(self):
+        pass
 
     # === STATE TRANSITIONS ===
     def transition_to_state_forward(self):
@@ -45,6 +55,14 @@ class BounceStateMachine:
         self.current_state = ControlState.BOUNCE
         self._reflect_heading()
         self.supervisor.current_controller = self.supervisor.go_to_angle_controller
+    
+    def transition_to_state_wait(self):
+        self.current_state = ControlState.WAIT_IN_SWARM
+        self.supervisor.current_controller = self.supervisor.wait_swarm_controller
+    
+    def transition_to_state_depart_swarm(self):
+        self.current_state = ControlState.DEPART_SWARM
+        self.supervisor.current_controller = self.supervisor.depart_swarm_controller
 
     # === CONDITIONS ===
     def condition_danger(self):

@@ -4,3 +4,6 @@ class DepartSwarmController:
 
     def update_heading(self):
         pass
+
+    def execute(self):
+        pass

@@ -4,3 +4,6 @@ class WaitSwarmController:
 
     def update_heading(self):
         pass
+
+    def execute(self):
+        pass
