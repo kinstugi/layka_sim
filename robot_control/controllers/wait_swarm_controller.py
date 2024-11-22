@@ -1,4 +1,5 @@
 from math import atan2, sin, cos
+# from robot_control.custom_behavior.behavior_controller_interface import BehaviorControllerInterface
 from utils import math_util
 
 class WaitSwarmController:
@@ -6,77 +7,58 @@ class WaitSwarmController:
         self.supervisor = supervisor
         self.k_p_angular = 5.0  # Proportional gain for angular velocity control
         self.k_p_linear = 1.0   # Proportional gain for linear velocity control
-        self.forward_speed = 0.1  # Base forward speed when distance is sufficient
         self.min_distance = 0.3  # Desired minimum distance between robots (in meters)
-
+    
     def update_heading(self):
-        """
-        Update the robot's target heading based on the average heading of nearby robots.
-        """
-        swarm_orientations = self.supervisor.supervisor.robot_detection_sensor_array
+        pass
 
-        if any(swarm_orientations):  # Check if any sensors detect robots
-            swarm_headings = [
-                self.supervisor.proximity_sensor_placements()[i].theta
-                for i, detected in enumerate(swarm_orientations) if detected
-            ]
-            avg_heading = atan2(
-                sum(sin(heading) for heading in swarm_headings),
-                sum(cos(heading) for heading in swarm_headings),
-            )
-            self.supervisor.supervisor.target_orientation = avg_heading
-
-    def calculate_distance_correction(self):
+    def calculate_adjustment(self):
         """
-        Calculate velocity correction to maintain the minimum distance from other robots.
+        Calculate linear and angular velocity to maintain the minimum distance from other robots.
         """
-        # Get distances from proximity sensors detecting robots
+        # Get distances and sensor angles of robots detected by proximity sensors
         proximity_distances = self.supervisor.proximity_sensor_distances()
+        sensor_placements = self.supervisor.proximity_sensor_placements()
 
-        # Filter only the sensors detecting other robots
-        robot_distances = [
-            distance
-            for distance, detected in zip(proximity_distances, self.supervisor.supervisor.robot_detection_sensor_array)
+        # Filter only sensors detecting other robots
+        robot_detections = [
+            (distance, placement)
+            for distance, placement, detected in zip(
+                proximity_distances, sensor_placements, self.supervisor.supervisor.robot_detection_sensor_array
+            )
             if detected
         ]
 
-        # If no robots detected, return the base forward speed
-        if not robot_distances:
-            return self.forward_speed
+        # If no nearby robots are detected, stop
+        if not robot_detections:
+            return 0.0, 0.0  # No adjustment needed
 
-        # Find the closest robot's distance
-        closest_distance = min(robot_distances)
+        # Compute the net repulsive force to adjust position
+        x_force = 0.0
+        y_force = 0.0
+        for distance, placement in robot_detections:
+            if distance < self.min_distance:
+                # Compute repulsion vector (pointing away from the detected robot)
+                repulsion_strength = self.min_distance - distance
+                x_force += repulsion_strength * cos(placement.theta)
+                y_force += repulsion_strength * sin(placement.theta)
 
-        # If the closest robot is within the minimum distance, reduce forward speed
-        if closest_distance < self.min_distance:
-            speed_correction = -self.k_p_linear * (self.min_distance - closest_distance)
-        else:
-            speed_correction = self.forward_speed
+        # Convert the resultant force into linear and angular velocity
+        target_angle = atan2(y_force, x_force)
+        angular_velocity = self.k_p_angular * math_util.normalize_angle(target_angle)
+        linear_velocity = self.k_p_linear * (x_force**2 + y_force**2)**0.5
 
-        # Ensure the velocity is non-negative
-        return max(speed_correction, 0.0)
+        # Ensure the linear velocity does not exceed the robot's limits
+        linear_velocity = max(0.0, min(linear_velocity, self.supervisor.v_max()))
+
+        return linear_velocity, angular_velocity
 
     def execute(self):
         """
-        Align with the swarm heading, maintain distance, and move forward.
+        Adjust position to maintain the desired distance without moving forward.
         """
-        # Update the swarm heading
-        self.update_heading()
-
-        # Get the target orientation from the supervisor
-        theta_d = self.supervisor.get_target_orientation()
-
-        # Get the current robot orientation
-        theta = self.supervisor.estimated_pose().theta
-
-        # Compute the heading error
-        e = math_util.normalize_angle(theta_d - theta)
-
-        # Compute angular velocity to align with swarm heading
-        omega = self.k_p_angular * e
-
-        # Compute forward velocity based on proximity correction
-        v = self.calculate_distance_correction()
+        # Compute adjustment velocities
+        v, omega = self.calculate_adjustment()
 
         # Set the control outputs
         self.supervisor.set_outputs(v, omega)
