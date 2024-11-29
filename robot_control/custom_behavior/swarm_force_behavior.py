@@ -1,6 +1,6 @@
-from math import log, radians
+from math import cos, log, radians, sin
 from models.pose import Pose
-from utils.linalg2_util import scale
+from utils.linalg2_util import scale, add
 from utils.math_util import cartesian_to_polar
 
 
@@ -55,6 +55,8 @@ class SwarmForceBehavior:
     def execute(self):
         f_vector = self.calculate_f_vector()
         # convert f_vector to v and omega send to robot
+        r, omega = self.f_to_velocities(f_vector)
+        self._send_robot_commands(r, omega)
 
     
     def calculate_f_vector(self):
@@ -65,18 +67,18 @@ class SwarmForceBehavior:
         
         a, b, c, d = 0.7, 0.1, 0.1, 0.9 # right now because keeping the proximity distance is most important it gets the most weight
 
-        proximal_vector = self.calculate_proximal_vector()
-        alignment_vector = self.calculate_alignment_vector()
-        goal_vector = self.calculate_goal_vector()
-        obstacle_avoidance_vector = self.calculate_obstacle_avoidance_vector()
+        proximal_vector = scale(self.calculate_proximal_vector(), a)
+        alignment_vector = scale(self.calculate_alignment_vector(), b)
+        goal_vector = scale(self.calculate_goal_vector(), c)
+        # obstacle_avoidance_vector = self.calculate_obstacle_avoidance_vector()
 
-        f_vector = scale(proximal_vector, a)  + scale(alignment_vector, b) +  scale(goal_vector, c) + scale(obstacle_avoidance_vector, d)
+        f_vector = add(proximal_vector, add(alignment_vector, goal_vector))
         return f_vector
 
     def f_to_velocities(self, f_vector: list) -> list:
-        v = f_vector[0]
-        w = f_vector[1]
-        return v, w
+        v = f_vector[0] * cos(self.estimated_pose.theta) + f_vector[1] * sin(self.estimated_pose.theta)
+        omega = f_vector[1] * cos(self.estimated_pose.theta) - f_vector[1] * sin(self.estimated_pose.theta)
+        return v, omega
 
 
     def calculate_proximal_vector(self)->tuple[float]:
@@ -99,8 +101,15 @@ class SwarmForceBehavior:
         return alignment_x, alignment_y
 
     def calculate_goal_vector(self)->tuple[float]:
-        goal_x, goal_y = 0, 0
-        return goal_x, goal_y
+        current_heading = self.estimated_pose.theta
+        goal_distance = 100
+
+        goal_x = self.estimated_pose.x + goal_distance * cos(current_heading)
+        goal_y = self.estimated_pose.y + goal_distance * sin(current_heading)
+
+        dx = goal_x - self.estimated_pose.x
+        dy = goal_y - self.estimated_pose.y
+        return dx, dy
 
     def calculate_obstacle_avoidance_vector(self)->tuple[float]:
         pass
@@ -116,10 +125,10 @@ class SwarmForceBehavior:
 
 
     # generate and send the correct commands to the robot
-    def _send_robot_commands(self):
+    def _send_robot_commands(self, v_output = 0, omega_output = 0):
         # limit the speeds:
-        v = max(min(self.v_output, self.v_max), -self.v_max)
-        omega = max(min(self.omega_output, self.omega_max), -self.omega_max)
+        v = max(min(v_output, self.v_max), -self.v_max)
+        omega = max(min(omega_output, self.omega_max), -self.omega_max)
 
         # send the drive commands to the robot
         v_l, v_r = self._uni_to_diff(v, omega)

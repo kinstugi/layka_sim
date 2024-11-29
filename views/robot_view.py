@@ -2,6 +2,7 @@ import utils.linalg2_util as linalg
 from views.bounce_behavior_view import BounceBehaviorView
 from views.proximity_sensor_view import ProximitySensorView
 from views.supervisor_view import SupervisorView
+from views.swarm_force_behavior_view import SwarmForceBehaviorView
 
 # Khepera III Dimensions
 K3_TOP_PLATE = [
@@ -36,7 +37,7 @@ class RobotView:
         self.robot = robot
 
         # add the supervisor views for this robot
-        self.supervisor_view = BounceBehaviorView(viewer, robot.supervisor, robot.geometry)
+        self.supervisor_view = SwarmForceBehaviorView(viewer, robot.supervisor, robot.geometry)
 
         # add the IR sensor views for this robot
         self.ir_sensor_views = []
