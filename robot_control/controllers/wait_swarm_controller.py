@@ -59,6 +59,6 @@ class WaitSwarmController:
         """
         # Compute adjustment velocities
         v, omega = self.calculate_adjustment()
-
+        v, omega = 0, 0 # just stop moving entirely
         # Set the control outputs
         self.supervisor.set_outputs(v, omega)

@@ -78,3 +78,6 @@ class Pose:
 
     def __str__(self):
         return f"X = {self.x} \t Y = {self.y} \t theta = {self.theta}"
+    
+    def __repr__(self) -> str:
+        return self.__str__()

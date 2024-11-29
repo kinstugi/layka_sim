@@ -1,4 +1,4 @@
-from math import sin, cos, atan2, pi
+from math import sin, cos, atan2, pi, tan
 import random
 
 
@@ -33,3 +33,8 @@ def generate_random_robot_poses(num_points):
         radian_angle = random.uniform(0, 2 * pi)  # Random angle between 0 and 2*pi
         points.append([x, y, radian_angle])
     return points
+
+def cartesian_to_polar(vect):
+    r = ((vect[0] ** 2) + (vect[1] ** 2)) ** 0.5
+    theta = atan2(vect[1] , vect[0])
+    return r, theta

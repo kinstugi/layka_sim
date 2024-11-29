@@ -32,7 +32,6 @@ class BounceStateMachine:
             if not self.condition_robot_nearby():
                 self.transition_to_state_bounce()
             else:
-                ## for now
                 self.transition_to_state_wait()
 
     def execute_state_bounce(self):
@@ -41,7 +40,12 @@ class BounceStateMachine:
             self.transition_to_state_forward()
     
     def execute_state_wait_swarm(self):
-        pass
+        if self.condition_danger() and self.condition_robot_nearby():
+            self.transition_to_state_wait()
+        elif self.condition_danger() and not self.condition_robot_nearby():
+            self.transition_to_state_bounce()
+        elif not self.condition_danger():
+            self.transition_to_state_forward()
 
     def execute_state_depart_swarm(self):
         pass

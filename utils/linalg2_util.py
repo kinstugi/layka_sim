@@ -12,7 +12,7 @@ def sub(a, b):
 
 
 # multiply a vector a by a scalar s
-def scale(a, s):
+def scale(a: list, s: int):
     return [s * a[0], s * a[1]]
 
 
