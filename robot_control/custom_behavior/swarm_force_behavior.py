@@ -1,5 +1,6 @@
 from math import cos, log, radians, sin
 from models.pose import Pose
+from utils.constants import ANGULAR_GAIN, LINEAR_GAIN
 from utils.linalg2_util import scale, add
 from utils.math_util import cartesian_to_polar
 
@@ -70,15 +71,17 @@ class SwarmForceBehavior:
         proximal_vector = scale(self.calculate_proximal_vector(), a)
         alignment_vector = scale(self.calculate_alignment_vector(), b)
         goal_vector = scale(self.calculate_goal_vector(), c)
+        
         # obstacle_avoidance_vector = self.calculate_obstacle_avoidance_vector()
-
         f_vector = add(proximal_vector, add(alignment_vector, goal_vector))
         return f_vector
 
     def f_to_velocities(self, f_vector: list) -> list:
-        v = f_vector[0] * cos(self.estimated_pose.theta) + f_vector[1] * sin(self.estimated_pose.theta)
-        omega = f_vector[1] * cos(self.estimated_pose.theta) - f_vector[1] * sin(self.estimated_pose.theta)
-        return v, omega
+        _orientation = self.robot.robot.pose.theta
+        v = f_vector[0] * cos(_orientation) + f_vector[1] * sin(_orientation)
+        omega = f_vector[1] * cos(_orientation) - f_vector[0] * sin(_orientation)
+    
+        return v * LINEAR_GAIN, omega * ANGULAR_GAIN
 
 
     def calculate_proximal_vector(self)->tuple[float]:
@@ -123,6 +126,8 @@ class SwarmForceBehavior:
             v for v in self.robot.read_robot_detection_array()
         ]
 
+    def calculate_individual_vector(self):
+        pass
 
     # generate and send the correct commands to the robot
     def _send_robot_commands(self, v_output = 0, omega_output = 0):
