@@ -1,4 +1,4 @@
-from math import cos, log, radians, sin
+from math import cos, log, radians, sin, pi
 from models.pose import Pose
 from utils.constants import ANGULAR_GAIN, LINEAR_GAIN
 from utils.linalg2_util import scale, add
@@ -10,6 +10,11 @@ K3_TRANS_VEL_LIMIT = 0.3148  # m/s
 K3_ANG_VEL_LIMIT = 2.2763  # rad/s
 
 class SwarmForceBehavior:
+    SEARCH = "search"
+    WAIT = "wait"
+    LEAVE = "leave"
+    AVOID_OBSTACLE = "avoid obstacle"
+
     def __init__(
         self,
         robot_interface,  # the interface through which this supervisor will interact with the robot
@@ -48,17 +53,39 @@ class SwarmForceBehavior:
         # CONTROL OUTPUTS - UNICYCLE
         self.v_output = 0.0
         self.omega_output = 0.0 
+        self.current_state = SwarmForceBehavior.SEARCH
 
     def step(self, dt):
         self.time += dt
         self.execute()
 
     def execute(self):
-        f_vector = self.calculate_f_vector()
-        # convert f_vector to v and omega send to robot
-        r, omega = self.f_to_velocities(f_vector)
-        self._send_robot_commands(r, omega)
+        self._update_state()
+        # f_vector = self.calculate_f_vector()
+        # # convert f_vector to v and omega send to robot
+        # r, omega = self.f_to_velocities(f_vector)
+        # self._send_robot_commands(r, omega)
+        if self.current_state == SwarmForceBehavior.AVOID_OBSTACLE:
+            self.execute_avoid_obstacle()
+        elif self.current_state == SwarmForceBehavior.WAIT:
+            self.execute_wait_in_swarm()
+        elif self.current_state == SwarmForceBehavior.SEARCH:
+            self.execute_search()
 
+    def execute_avoid_obstacle(self):
+        print(".... avoiding obstacle")
+
+    def execute_wait_in_swarm(self):
+        print(".... waiting in swarm")
+
+    def execute_search(self):
+        print(".... search mode")
+        if self.detect_robots_nearby():
+            self.current_state = SwarmForceBehavior.WAIT
+        elif self.detect_obstacle():
+            self.current_state = SwarmForceBehavior.AVOID_OBSTACLE
+        else:
+            self.move_forward()
     
     def calculate_f_vector(self):
         # ... implement the calculation of f based on sensor data and desired behaviors
@@ -104,30 +131,41 @@ class SwarmForceBehavior:
         return alignment_x, alignment_y
 
     def calculate_goal_vector(self)->tuple[float]:
-        current_heading = self.estimated_pose.theta
-        goal_distance = 100
+        # current_heading = self.estimated_pose.theta
+        # goal_distance = 100
 
-        goal_x = self.estimated_pose.x + goal_distance * cos(current_heading)
-        goal_y = self.estimated_pose.y + goal_distance * sin(current_heading)
+        # goal_x = self.estimated_pose.x + goal_distance * cos(current_heading)
+        # goal_y = self.estimated_pose.y + goal_distance * sin(current_heading)
 
-        dx = goal_x - self.estimated_pose.x
-        dy = goal_y - self.estimated_pose.y
-        return dx, dy
+        # dx = goal_x - self.estimated_pose.x
+        # dy = goal_y - self.estimated_pose.y
+        # return dx, dy
+        return 0, 0
 
     def calculate_obstacle_avoidance_vector(self)->tuple[float]:
         pass
 
-    def _update_proximity_sensor_distances(self):
-        self.proximity_sensor_distances = [
-            0.02 - (log(readval / 3960.0)) / 30.0
-            for readval in self.robot.read_proximity_sensors()
-        ]
-        self.robot_detection_sensor_array = [
-            v for v in self.robot.read_robot_detection_array()
-        ]
-
     def calculate_individual_vector(self):
         pass
+    
+    def move_forward(self):
+        self._send_robot_commands(0.15, 0)
+    
+    def turn_at_angle(self, angle = None):
+        if not angle:
+            angle = pi / 2
+        self._send_robot_commands(0, angle)
+
+    def detect_obstacle(self):
+        return any(dist < self.proximity_sensor_max_range for dist in self.proximity_sensor_distances[2: 6])
+
+    def detect_robots_nearby(self):
+        return any(self.robot_detection_sensor_array)
+
+    def _update_state(self):
+        # update estimated robot state from sensor readings
+        self._update_proximity_sensor_distances()
+        self._update_odometry()
 
     # generate and send the correct commands to the robot
     def _send_robot_commands(self, v_output = 0, omega_output = 0):
@@ -162,3 +200,44 @@ class SwarmForceBehavior:
         omega = (R / L) * (v_r - v_l)
 
         return v, omega
+
+   # update the estimated position of the robot using it's wheel encoder readings
+    def _update_odometry(self):
+        R = self.robot_wheel_radius
+        N = float(self.wheel_encoder_ticks_per_revolution)
+
+        # read the wheel encoder values
+        ticks_left, ticks_right = self.robot.read_wheel_encoders()
+
+        # get the difference in ticks since the last iteration
+        d_ticks_left = ticks_left - self.prev_ticks_left
+        d_ticks_right = ticks_right - self.prev_ticks_right
+
+        # estimate the wheel movements
+        d_left_wheel = 2 * pi * R * (d_ticks_left / N)
+        d_right_wheel = 2 * pi * R * (d_ticks_right / N)
+        d_center = 0.5 * (d_left_wheel + d_right_wheel)
+
+        # calculate the new pose
+        prev_x, prev_y, prev_theta = self.estimated_pose.sunpack()
+        new_x = prev_x + (d_center * cos(prev_theta))
+        new_y = prev_y + (d_center * sin(prev_theta))
+        new_theta = prev_theta + (
+            (d_right_wheel - d_left_wheel) / self.robot_wheel_base_length
+        )
+
+        # update the pose estimate with the new values
+        self.estimated_pose.supdate(new_x, new_y, new_theta)
+
+        # save the current tick count for the next iteration
+        self.prev_ticks_left = ticks_left
+        self.prev_ticks_right = ticks_right
+
+    def _update_proximity_sensor_distances(self):
+        self.proximity_sensor_distances = [
+            0.02 - (log(readval / 3960.0)) / 30.0
+            for readval in self.robot.read_proximity_sensors()
+        ]
+        self.robot_detection_sensor_array = [
+            v for v in self.robot.read_robot_detection_array()
+        ]
