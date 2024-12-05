@@ -9,6 +9,10 @@ from utils.math_util import cartesian_to_polar
 K3_TRANS_VEL_LIMIT = 0.3148  # m/s
 K3_ANG_VEL_LIMIT = 2.2763  # rad/s
 
+# Distance thresholds for obstacle detection
+D_CAUTION = 0.20  # meters from obstacle
+D_DANGER = 0.15   # meters from obstacle
+
 class SwarmForceBehavior:
     SEARCH = "search"
     WAIT = "wait"
@@ -73,10 +77,16 @@ class SwarmForceBehavior:
             self.execute_search()
 
     def execute_avoid_obstacle(self):
-        print(".... avoiding obstacle")
+        print("..... avoiding obstacle")
+        self.turn_to_avoid_obstacle()
+        self.current_state = SwarmForceBehavior.SEARCH
 
     def execute_wait_in_swarm(self):
         print(".... waiting in swarm")
+        f_vector = self.calculate_f_vector()
+        r, omega = self.f_to_velocities(f_vector)
+        # i have to put a condition here for robot to leave swarm and resume search
+        self._send_robot_commands(r, omega)
 
     def execute_search(self):
         print(".... search mode")
@@ -145,19 +155,22 @@ class SwarmForceBehavior:
     def calculate_obstacle_avoidance_vector(self)->tuple[float]:
         pass
 
-    def calculate_individual_vector(self):
-        pass
+    def calculate_individual_vectors(self):
+        p_vec = self.calculate_proximal_vector()
+        h_vec = self.calculate_alignment_vector()
+        g_vec = self.calculate_goal_vector()
+        return p_vec, h_vec, g_vec, [0, 0]
     
     def move_forward(self):
         self._send_robot_commands(0.15, 0)
     
-    def turn_at_angle(self, angle = None):
+    def turn_to_avoid_obstacle(self, angle = None):
         if not angle:
-            angle = pi / 2
+            angle = pi / 4
         self._send_robot_commands(0, angle)
 
     def detect_obstacle(self):
-        return any(dist < self.proximity_sensor_max_range for dist in self.proximity_sensor_distances[2: 6])
+        return any(d < D_DANGER for d in self._forward_sensor_distances())
 
     def detect_robots_nearby(self):
         return any(self.robot_detection_sensor_array)
@@ -200,6 +213,10 @@ class SwarmForceBehavior:
         omega = (R / L) * (v_r - v_l)
 
         return v, omega
+
+    def _forward_sensor_distances(self):
+        # Assumes the forward sensors are from indices 1 to 7
+        return self.proximity_sensor_distances[1:7]
 
    # update the estimated position of the robot using it's wheel encoder readings
     def _update_odometry(self):

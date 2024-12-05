@@ -34,6 +34,7 @@ def mag(a):
 # get the unit vector of a vector
 def unit(a):
     m = mag(a)
+    if not m: return [0, 0]
     return [a[0] / m, a[1] / m]
 
 
@@ -123,3 +124,19 @@ def determine_side_of_line(lpoint1, lpoint2, tpoint):
     d = (ty - l1y) * (l2x - l1x) - (tx - l1x) * (l2y - l1y)
 
     return d if d == 0 else int(d / abs(d))
+
+
+def translate_vectors(vectors, translation):
+    """
+    Translates a list of vectors by a given translation vector.
+
+    Args:
+        vectors (list of list): A list of vectors to be translated, where each vector is [x, y].
+                                Example: [[0.0, 0.0], [1.0, 0.0]] for a line segment.
+        translation (list or tuple): The translation vector [dx, dy].
+
+    Returns:
+        list of list: The translated vectors.
+    """
+    dx, dy = translation  # Decompose translation vector
+    return [[x + dx, y + dy] for x, y in vectors]
