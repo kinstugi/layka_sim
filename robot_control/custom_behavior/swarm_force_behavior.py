@@ -77,19 +77,21 @@ class SwarmForceBehavior:
             self.execute_search()
 
     def execute_avoid_obstacle(self):
-        print("..... avoiding obstacle")
+        # print("..... avoiding obstacle")
         self.turn_to_avoid_obstacle()
         self.current_state = SwarmForceBehavior.SEARCH
 
     def execute_wait_in_swarm(self):
-        print(".... waiting in swarm")
+        # print(".... waiting in swarm")
+        if not self.detect_robots_nearby():
+            print("bots not detected")
         f_vector = self.calculate_f_vector()
         r, omega = self.f_to_velocities(f_vector)
         # i have to put a condition here for robot to leave swarm and resume search
         self._send_robot_commands(r, omega)
 
     def execute_search(self):
-        print(".... search mode")
+        # print(".... search mode")
         if self.detect_robots_nearby():
             self.current_state = SwarmForceBehavior.WAIT
         elif self.detect_obstacle():
@@ -103,14 +105,16 @@ class SwarmForceBehavior:
         # - Calculate the proximal, alignment, and goal-seeking components of the f vector.
         # - Combine these components using the weights a, b, and c.
         
-        a, b, c, d = 0.7, 0.1, 0.1, 0.9 # right now because keeping the proximity distance is most important it gets the most weight
+        a, b, c, d = 0.7, 0.1, 0.1, 0.3 # right now because keeping the proximity distance is most important it gets the most weight
 
-        proximal_vector = scale(self.calculate_proximal_vector(), a)
+        # proximal_vector = scale(self.calculate_proximal_vector(), a)
+        proximal_vector = scale(self.calculate_attraction_repulsion_vector(), a)
         alignment_vector = scale(self.calculate_alignment_vector(), b)
         goal_vector = scale(self.calculate_goal_vector(), c)
-        
+        noise_vector = scale(self.calculate_noise_vector(), d)
+        # print(proximal_vector, goal_vector, alignment_vector, noise_vector)
         # obstacle_avoidance_vector = self.calculate_obstacle_avoidance_vector()
-        f_vector = add(proximal_vector, add(alignment_vector, goal_vector))
+        f_vector = add(proximal_vector, add(alignment_vector, add(goal_vector, noise_vector)))
         return f_vector
 
     def f_to_velocities(self, f_vector: list) -> list:
@@ -125,7 +129,7 @@ class SwarmForceBehavior:
         proximal_x, proximal_y = 0, 0
 
         strength_of_repulsion = 1.5
-        proximal_distance = 0.26
+        proximal_distance = 0.07
 
         for neighbor_pose in self.robot.read_robot_neighbors_pose():
             r, _ = cartesian_to_polar([neighbor_pose.x, neighbor_pose.y])
@@ -136,6 +140,30 @@ class SwarmForceBehavior:
 
         return proximal_x, proximal_y
     
+    def calculate_attraction_repulsion_vector(self):
+        proximal_x, proximal_y = 0, 0
+
+        desired_distance = 0.15
+        attraction_gain = 1.0
+        repulsion_gain = 1.5
+
+        for neighbor_pose in self.robot.read_robot_neighbors_pose():
+            dx, dy = neighbor_pose.x, neighbor_pose.y
+            r, angle = cartesian_to_polar([dx, dy])  # Get distance and angle to neighbor
+
+            if r > desired_distance:
+            # Attraction force (pulls closer)
+                attraction = attraction_gain * (r - desired_distance)
+                proximal_x += attraction * cos(angle)
+                proximal_y += attraction * sin(angle)
+            elif r < desired_distance:
+                # Repulsion force (pushes away)
+                repulsion = repulsion_gain * (desired_distance - r)
+                proximal_x -= repulsion * cos(angle)
+                proximal_y -= repulsion * sin(angle)    
+
+        return proximal_x, proximal_y
+
     def calculate_alignment_vector(self)->tuple[float]:
         alignment_x, alignment_y = 0, 0
         return alignment_x, alignment_y
@@ -152,8 +180,14 @@ class SwarmForceBehavior:
         # return dx, dy
         return 0, 0
 
-    def calculate_obstacle_avoidance_vector(self)->tuple[float]:
-        pass
+    def calculate_noise_vector(self):
+        import random
+        # Generate a small random vector for noise
+        random_angle = random.uniform(0, 2 * pi)
+        random_magnitude = random.uniform(0, 10)  # Adjust magnitude range as needed
+        return [0, 0]
+        return [random_magnitude * cos(random_angle), random_magnitude * sin(random_angle)]
+
 
     def calculate_individual_vectors(self):
         p_vec = self.calculate_proximal_vector()
