@@ -4,6 +4,7 @@ from utils.constants import ANGULAR_GAIN, LINEAR_GAIN
 from utils.linalg2_util import scale, add
 from utils.math_util import cartesian_to_polar
 
+#remember to plot the proximal vector
 
 # control parameters
 K3_TRANS_VEL_LIMIT = 0.3148  # m/s
@@ -88,6 +89,7 @@ class SwarmForceBehavior:
         f_vector = self.calculate_f_vector()
         r, omega = self.f_to_velocities(f_vector)
         # i have to put a condition here for robot to leave swarm and resume search
+        print(r, omega, "<<<<<<<<<<<<<<<<")
         self._send_robot_commands(r, omega)
 
     def execute_search(self):
@@ -107,8 +109,7 @@ class SwarmForceBehavior:
         
         a, b, c, d = 0.7, 0.1, 0.1, 0.3 # right now because keeping the proximity distance is most important it gets the most weight
 
-        # proximal_vector = scale(self.calculate_proximal_vector(), a)
-        proximal_vector = scale(self.calculate_attraction_repulsion_vector(), a)
+        proximal_vector = scale(self.calculate_proximal_vector(), a)
         alignment_vector = scale(self.calculate_alignment_vector(), b)
         goal_vector = scale(self.calculate_goal_vector(), c)
         noise_vector = scale(self.calculate_noise_vector(), d)
@@ -139,45 +140,12 @@ class SwarmForceBehavior:
             proximal_y += attr_repul * neighbor_pose.y
 
         return proximal_x, proximal_y
-    
-    def calculate_attraction_repulsion_vector(self):
-        proximal_x, proximal_y = 0, 0
-
-        desired_distance = 0.15
-        attraction_gain = 1.0
-        repulsion_gain = 1.5
-
-        for neighbor_pose in self.robot.read_robot_neighbors_pose():
-            dx, dy = neighbor_pose.x, neighbor_pose.y
-            r, angle = cartesian_to_polar([dx, dy])  # Get distance and angle to neighbor
-
-            if r > desired_distance:
-            # Attraction force (pulls closer)
-                attraction = attraction_gain * (r - desired_distance)
-                proximal_x += attraction * cos(angle)
-                proximal_y += attraction * sin(angle)
-            elif r < desired_distance:
-                # Repulsion force (pushes away)
-                repulsion = repulsion_gain * (desired_distance - r)
-                proximal_x -= repulsion * cos(angle)
-                proximal_y -= repulsion * sin(angle)    
-
-        return proximal_x, proximal_y
 
     def calculate_alignment_vector(self)->tuple[float]:
         alignment_x, alignment_y = 0, 0
         return alignment_x, alignment_y
 
     def calculate_goal_vector(self)->tuple[float]:
-        # current_heading = self.estimated_pose.theta
-        # goal_distance = 100
-
-        # goal_x = self.estimated_pose.x + goal_distance * cos(current_heading)
-        # goal_y = self.estimated_pose.y + goal_distance * sin(current_heading)
-
-        # dx = goal_x - self.estimated_pose.x
-        # dy = goal_y - self.estimated_pose.y
-        # return dx, dy
         return 0, 0
 
     def calculate_noise_vector(self):

@@ -20,7 +20,7 @@ from models.custom_robots.test_robot import Testbot
 from utils.math_util import generate_random_robot_poses
 
 REFRESH_RATE = 20.0  # hertz
-test_poses = [(1, 0, math.pi), (-1, 0, 0), (0, 1,  3 * math.pi / 2), (0, -1, math.pi / 2)]
+test_poses = [(0.12, 0, math.pi), (-0.12, 0, 0)]
 
 
 class Simulator:
