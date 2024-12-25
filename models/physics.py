@@ -66,7 +66,7 @@ class Physics:
                                 dmin = d
                                 if solid.__str__() == "robot":
                                     robot_detected = True
-                                    detected_poses.append(solid.pose)
+                                    detected_poses.append((solid.pose, d))
 
                 # if there is an intersection, update the sensor with the new delta
                 # value
