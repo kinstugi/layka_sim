@@ -146,7 +146,7 @@ class SwarmForceBehavior:
             proximal_x += attr_repul * neighbor_pose.x
             proximal_y += attr_repul * neighbor_pose.y
 
-            print("r_min", r_min, "r", r, "attr_repul", attr_repul)   
+            # print("r_min", r_min, "r", r, "attr_repul", attr_repul)   
     
         # print("robots nearby", len(self.robot.read_robot_neighbors_pose()))
         return proximal_x, proximal_y
