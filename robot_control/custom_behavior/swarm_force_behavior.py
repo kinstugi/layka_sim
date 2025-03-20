@@ -86,6 +86,9 @@ class SwarmForceBehavior:
         # print(".... waiting in swarm")
         if not self.detect_robots_nearby():
             print("bots not detected")
+            # self.current_state = SwarmForceBehavior.AVOID_OBSTACLE
+        else:
+            print("bots detected")
         f_vector = self.calculate_f_vector()
         r, omega = self.f_to_velocities(f_vector)
         # i have to put a condition here for robot to leave swarm and resume search
@@ -113,8 +116,6 @@ class SwarmForceBehavior:
         goal_vector = scale(self.calculate_goal_vector(), c)
         noise_vector = scale(self.calculate_noise_vector(), d)
         
-        # print(proximal_vector, goal_vector, alignment_vector, noise_vector)
-        # obstacle_avoidance_vector = self.calculate_obstacle_avoidance_vector()
         f_vector = add(proximal_vector, add(alignment_vector, add(goal_vector, noise_vector)))
         return f_vector
 
@@ -128,11 +129,7 @@ class SwarmForceBehavior:
 
     def calculate_proximal_vector(self)->tuple[float]:
         proximal_x, proximal_y = 0, 0
-
-        strength_of_repulsion = 0.6 # the point where the attraction becomes repulsion
-        proximal_distance = 1.8
         epsilon = 1
-        # sigma = 2 * log(proximal_distance, 2)   # the point where the attraction becomes repulsion
     
         r_min = 0.40 # the distance at which the attraction and repulsion forces are equal
         sigma = r_min / (2**(1/6))
@@ -146,9 +143,6 @@ class SwarmForceBehavior:
             proximal_x += attr_repul * neighbor_pose.x
             proximal_y += attr_repul * neighbor_pose.y
 
-            # print("r_min", r_min, "r", r, "attr_repul", attr_repul)   
-    
-        # print("robots nearby", len(self.robot.read_robot_neighbors_pose()))
         return proximal_x, proximal_y
 
     def calculate_alignment_vector(self)->tuple[float]:

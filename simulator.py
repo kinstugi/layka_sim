@@ -20,7 +20,7 @@ from models.custom_robots.test_robot import Testbot
 from utils.math_util import generate_random_robot_poses
 
 REFRESH_RATE = 20.0  # hertz
-test_poses = [(0.12, 0, math.pi), (-0.20, 0, 0)]
+test_poses = [(0.12, 0, math.pi), (-0.20, 0, 0) ] #(0, 0.2, 0) (0, -0.21, 0.1)
 
 
 class Simulator:
@@ -61,7 +61,7 @@ class Simulator:
         self.world = World(self.period)
 
         # create the robots
-        # robots = [Layka(initial_pose=pose) for pose in generate_random_robot_poses(15, 0.3)]
+        robots = [Layka(initial_pose=pose) for pose in generate_random_robot_poses(5, 0.3)]
         robots = [Layka(initial_pose=pose) for pose in test_poses ]
 
         for robot in robots:
