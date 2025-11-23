@@ -13,6 +13,7 @@ Sobot Rimulator is inspired by [Sim.I.Am](http://jpdelacroix.com/software/simiam
 - [Getting Started](#getting-started)
 - [User Interface](#user-interface)
 - [Robot Control System Overview](#robot-control-system-overview)
+- [Swarm Force Behavior](#swarm-force-behavior)
 
 ## Getting Started
 
@@ -166,3 +167,147 @@ Before the `SupervisorStateMachine` updates, each controller generates a heading
 After the `SupervisorStateMachine` has updated the control state, the controller that it chose to activate is executed. The active controller generates movement parameters intended to effectively move the robot towards that controller's heading vector. These parameters are given using the "unicycle model" of movement (i.e. a translational velocity parameter (v) and an angular velocity parameter (omega)). The controller updates the `Supervisor` with these new parameters.
 
 Once the final movement parameters have been calculated and applied, the `Supervisor` will transform them from the "unicycle" model into the corresponding wheel movement rates of a "differential drive" model, and command the robot to drive the wheels using these rates.
+
+## Swarm Force Behavior
+
+The simulator includes a custom swarm behavior implementation (`SwarmForceBehavior`) that enables robots to interact with each other using physics-based forces. This behavior implements a multi-robot system where robots can detect each other, form swarms, and maintain appropriate distances through attraction and repulsion forces.
+
+### Features
+
+#### Robot Detection
+- Robots can distinguish between other robots and static obstacles (walls)
+- Each robot uses its infrared proximity sensors to detect nearby robots
+- The `robot_detection_sensor_array` identifies which sensors are detecting other robots vs. walls
+- Robot positions are tracked and shared through the sensor system
+
+#### Lennard-Jones Potential
+The swarm behavior uses a **Lennard-Jones potential** to model inter-robot interactions:
+
+- **Repulsion**: When robots are too close (distance < σ = 0.40m), they experience a repulsive force that pushes them apart
+- **Attraction**: When robots are far apart (distance > σ = 0.40m), they experience an attractive force that pulls them together
+- **Equilibrium**: At the equilibrium distance (σ = 0.40m), attraction and repulsion balance, maintaining optimal spacing
+
+The force is calculated using the standard Lennard-Jones formula:
+```
+F(r) = 24 * ε * (2*(σ/r)¹² - (σ/r)⁶) / r
+```
+
+Where:
+- `ε` (epsilon) = 1.0: Depth of the potential well
+- `σ` (sigma) = 0.40m: Equilibrium distance where force is zero
+
+#### State Machine
+
+The `SwarmForceBehavior` implements a state machine with three main states:
+
+1. **SEARCH Mode**
+   - Active when no robots are detected nearby
+   - Robot wanders around exploring the environment
+   - Performs random turns periodically to increase exploration coverage
+   - Moves forward while searching for other robots
+   - Transitions to WAIT mode when a robot is detected
+   - Transitions to AVOID_OBSTACLE mode when a wall is encountered
+
+2. **WAIT Mode (Swarm Mode)**
+   - Active when robots are detected within sensor range
+   - Applies Lennard-Jones forces for attraction/repulsion
+   - Combines multiple force vectors:
+     - **Proximal vector**: Lennard-Jones attraction/repulsion forces
+     - **Alignment vector**: (Currently unused, available for future flocking behaviors)
+     - **Goal vector**: (Currently unused, available for goal-seeking behaviors)
+     - **Noise vector**: (Currently disabled, available for stochastic behaviors)
+   - Automatically returns to SEARCH mode if robots move out of range
+   - Still avoids walls/obstacles even when in swarm mode
+
+3. **AVOID_OBSTACLE Mode**
+   - Active when walls or static obstacles are detected (not robots)
+   - Calculates the safest direction to turn based on sensor readings
+   - Only considers obstacles, ignoring robot detections
+   - Automatically returns to previous mode once obstacle is cleared
+
+#### Obstacle Avoidance
+
+The behavior distinguishes between:
+- **Robots**: Detected through `robot_detection_sensor_array` - these trigger attraction/repulsion forces
+- **Walls/Obstacles**: Detected when sensors read obstacles but `robot_detection_sensor_array` is false - these trigger avoidance behavior
+
+This allows robots to:
+- Form swarms with other robots
+- Avoid collisions with walls
+- Navigate around static obstacles while maintaining swarm cohesion
+
+### Usage
+
+To use the swarm force behavior, robots should be configured with the `SwarmForceBehavior` supervisor. The behavior automatically:
+- Detects nearby robots through proximity sensors
+- Calculates appropriate forces based on distances
+- Transitions between search, swarm, and obstacle avoidance modes
+- Maintains safe distances from both robots and obstacles
+
+### Implementation Details
+
+The swarm force behavior is implemented in `robot_control/custom_behavior/swarm_force_behavior.py`. Below are the key functions and their purposes:
+
+#### Main Control Functions
+
+- **`execute()`** (line 78): Main control loop that routes execution to the appropriate state handler based on `current_state`
+- **`step(dt)`** (line 74): Called each simulation step to update time and execute the behavior
+- **`_update_state()`** (line 286): Updates sensor readings and odometry estimates
+
+#### State Execution Functions
+
+- **`execute_search()`** (line 115): Handles SEARCH mode - checks for robots/obstacles and initiates wandering behavior
+- **`execute_wait_in_swarm()`** (line 98): Handles WAIT mode - applies Lennard-Jones forces when robots are detected
+- **`execute_avoid_obstacle()`** (line 91): Handles AVOID_OBSTACLE mode - turns away from walls/obstacles
+- **`execute_search_wander()`** (line 207): Implements active exploration with random turns during search
+
+#### Force Calculation Functions
+
+- **`calculate_f_vector()`** (line 129): Combines all force vectors (proximal, alignment, goal, noise) into a single resultant force
+- **`calculate_proximal_vector()`** (line 153): **Core function** - calculates Lennard-Jones attraction/repulsion forces between robots
+  - Iterates through all detected robot neighbors
+  - Computes force magnitude using: `F(r) = 24 * ε * (2*(σ/r)¹² - (σ/r)⁶) / r`
+  - Returns combined force vector in (x, y) format
+- **`calculate_alignment_vector()`** (line 182): Placeholder for future flocking alignment behavior (currently returns zero)
+- **`calculate_goal_vector()`** (line 186): Placeholder for goal-seeking behavior (currently returns zero)
+- **`calculate_noise_vector()`** (line 189): Placeholder for stochastic noise (currently disabled)
+- **`f_to_velocities(f_vector)`** (line 145): Converts force vector to unicycle model velocities (v, omega)
+
+#### Detection Functions
+
+- **`detect_robots_nearby()`** (line 283): Checks if any sensors are detecting other robots
+  - Uses `robot_detection_sensor_array` to identify robot detections
+- **`detect_obstacle()`** (line 264): Detects walls/obstacles (NOT robots)
+  - Only returns True if sensors detect obstacles that are NOT robots
+  - Distinguishes between robots and walls using `robot_detection_sensor_array`
+- **`_forward_sensor_distances()`** (line 325): Returns distances from forward-facing sensors (indices 1-7)
+
+#### Robot Interface Functions
+
+The behavior interacts with robots through the `RobotSupervisorInterface` (`robot_control/robot_supervisor_interface.py`):
+
+- **`read_robot_neighbors_pose()`** (interface line 22): Returns list of detected robot poses and distances
+- **`read_robot_detection_array()`** (interface line 19): Returns boolean array indicating which sensors detect robots
+- **`read_proximity_sensors()`** (interface line 7): Returns raw proximity sensor readings
+- **`set_wheel_drive_rates(v_l, v_r)`** (interface line 15): Sends wheel velocity commands to robot
+
+#### Helper Functions
+
+- **`turn_to_avoid_obstacle(angle)`** (line 223): Calculates optimal turn direction to avoid obstacles
+  - Analyzes sensor readings to find direction with most clearance
+  - Only considers obstacles (ignores robot detections)
+- **`move_forward()`** (line 204): Simple forward movement command
+- **`_send_robot_commands(v, omega)`** (line 292): Converts unicycle velocities to wheel rates and sends to robot
+- **`_uni_to_diff(v, omega)`** (line 301): Converts unicycle model to differential drive wheel velocities
+- **`_update_odometry()`** (line 330): Updates robot's estimated pose using wheel encoder readings
+- **`_update_proximity_sensor_distances()`** (line 361): Updates sensor distance readings and robot detection array
+
+### Configuration
+
+Key parameters that can be adjusted in `SwarmForceBehavior`:
+
+- `epsilon` (default: 1.0): Controls the strength of the Lennard-Jones potential
+- `sigma` (default: 0.40m): Equilibrium distance between robots
+- `search_wander_interval` (default: 5.0s): Time between random turns during search
+- `search_turn_angle` (default: π/3): Angle of random turns during search
+- Force vector weights: `a`, `b`, `c`, `d` for proximal, alignment, goal, and noise vectors respectively (defined in `calculate_f_vector()`)

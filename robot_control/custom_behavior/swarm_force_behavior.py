@@ -60,6 +60,17 @@ class SwarmForceBehavior:
         self.omega_output = 0.0 
         self.current_state = SwarmForceBehavior.SEARCH
 
+        # Lennard-Jones parameters
+        self.epsilon = 1.0  # Depth of the potential well
+        self.sigma = 0.40  # Distance at which the potential is zero
+        
+        # Search behavior parameters
+        self.search_turn_timer = 0.0
+        self.search_turn_duration = 2.0  # seconds to turn when searching
+        self.search_turn_angle = pi / 3  # angle to turn during search
+        self.last_search_turn_time = 0.0
+        self.search_wander_interval = 5.0  # seconds between random turns
+
     def step(self, dt):
         self.time += dt
         self.execute()
@@ -78,30 +89,42 @@ class SwarmForceBehavior:
             self.execute_search()
 
     def execute_avoid_obstacle(self):
-        # print("..... avoiding obstacle")
+        # Turn away from obstacle
         self.turn_to_avoid_obstacle()
-        self.current_state = SwarmForceBehavior.SEARCH
+        # Check if obstacle is cleared, if so return to search
+        if not self.detect_obstacle():
+            self.current_state = SwarmForceBehavior.SEARCH
 
     def execute_wait_in_swarm(self):
-        # print(".... waiting in swarm")
+        # Check if robots are still nearby (within sensor range)
         if not self.detect_robots_nearby():
-            print("bots not detected")
-            # self.current_state = SwarmForceBehavior.AVOID_OBSTACLE
-        else:
-            print("bots detected")
+            # No robots detected, return to search mode
+            self.current_state = SwarmForceBehavior.SEARCH
+            return
+        
+        # Check for obstacles (walls) - avoid them even in swarm mode
+        if self.detect_obstacle():
+            self.current_state = SwarmForceBehavior.AVOID_OBSTACLE
+            return
+        
+        # Apply Lennard-Jones forces for attraction/repulsion
         f_vector = self.calculate_f_vector()
         r, omega = self.f_to_velocities(f_vector)
-        # i have to put a condition here for robot to leave swarm and resume search
         self._send_robot_commands(r, omega)
 
     def execute_search(self):
-        # print(".... search mode")
+        # Check if robots are detected - switch to swarm mode
         if self.detect_robots_nearby():
             self.current_state = SwarmForceBehavior.WAIT
-        elif self.detect_obstacle():
+            return
+        
+        # Check for obstacles (walls) - avoid them
+        if self.detect_obstacle():
             self.current_state = SwarmForceBehavior.AVOID_OBSTACLE
-        else:
-            self.move_forward()
+            return
+        
+        # Active search behavior: wander around looking for robots
+        self.execute_search_wander()
     
     def calculate_f_vector(self):
         # ... implement the calculation of f based on sensor data and desired behaviors
@@ -129,19 +152,30 @@ class SwarmForceBehavior:
 
     def calculate_proximal_vector(self)->tuple[float]:
         proximal_x, proximal_y = 0, 0
-        epsilon = 1
-    
-        r_min = 0.40 # the distance at which the attraction and repulsion forces are equal
-        sigma = r_min / (2**(1/6))
 
         for neighbor_pose, r in self.robot.read_robot_neighbors_pose():
-            # r, _ = cartesian_to_polar([neighbor_pose.x, neighbor_pose.y])
-            # attr_repul = -8 * strength_of_repulsion * (2 * ((sigma ** 4) / (r ** 5)) - ((sigma ** 2) / (r ** 3)))
-            # attr_repul = 4 * strength_of_repulsion * ((proximal_distance ** 12/ r ** 12) - (proximal_distance ** 6 / r ** 6))
-            attr_repul = -24 * epsilon * ((2 * (sigma / r)**12) - ((sigma / r)**6)) / r
+            # Calculate vector from self to neighbor
+            dx = neighbor_pose.x - self.estimated_pose.x
+            dy = neighbor_pose.y - self.estimated_pose.y
+            r = sqrt(dx**2 + dy**2)
 
-            proximal_x += attr_repul * neighbor_pose.x
-            proximal_y += attr_repul * neighbor_pose.y
+            force_magnitude = 0.0
+            if r > 0.01:  # Avoid division by zero
+                # Standard Lennard-Jones force formula:
+                # F(r) = 24 * epsilon * (2*(sigma/r)^12 - (sigma/r)^6) / r
+                # When r < sigma: force is positive (repulsive)
+                # When r > sigma: force is negative (attractive)
+                force_magnitude = 24 * self.epsilon * ((2 * (self.sigma / r)**12) - ((self.sigma / r)**6)) / r
+                
+                # Normalize direction vector (points from self to neighbor)
+                dx_normalized = dx / r
+                dy_normalized = dy / r
+                
+                # Apply force: flip sign because dx/dy point toward neighbor
+                # When force_magnitude > 0 (repulsive): -force pushes AWAY from neighbor
+                # When force_magnitude < 0 (attractive): -force pulls TOWARD neighbor
+                proximal_x += -force_magnitude * dx_normalized
+                proximal_y += -force_magnitude * dy_normalized
 
         return proximal_x, proximal_y
 
@@ -170,13 +204,81 @@ class SwarmForceBehavior:
     def move_forward(self):
         self._send_robot_commands(0.15, 0)
     
+    def execute_search_wander(self):
+        """
+        Active search behavior: moves forward with occasional random turns
+        to explore the environment looking for other robots.
+        """
+        # Randomly turn occasionally to explore
+        if self.time - self.last_search_turn_time > self.search_wander_interval:
+            # Random turn direction
+            import random
+            turn_direction = random.choice([-1, 1])
+            self._send_robot_commands(0.1, turn_direction * self.search_turn_angle)
+            self.last_search_turn_time = self.time
+        else:
+            # Move forward while searching
+            self.move_forward()
+    
     def turn_to_avoid_obstacle(self, angle = None):
+        """
+        Turn away from obstacle. Calculates best direction to turn based on
+        sensor readings to avoid the obstacle.
+        """
         if not angle:
-            angle = pi / 4
+            # Find the direction with the most clearance
+            forward_distances = self._forward_sensor_distances()
+            # Get sensor indices for forward sensors (1-7)
+            sensor_indices = list(range(1, min(8, len(self.proximity_sensor_distances))))
+            
+            # Find sensors that are NOT detecting robots (only walls/obstacles)
+            non_robot_distances = []
+            non_robot_indices = []
+            for i, dist in enumerate(forward_distances):
+                sensor_idx = sensor_indices[i] if i < len(sensor_indices) else i + 1
+                if sensor_idx < len(self.robot_detection_sensor_array):
+                    # Only consider obstacles (not robots)
+                    if not self.robot_detection_sensor_array[sensor_idx]:
+                        non_robot_distances.append(dist)
+                        non_robot_indices.append(sensor_idx)
+            
+            if non_robot_distances:
+                # Find the sensor with maximum distance (safest direction)
+                max_dist_idx = non_robot_distances.index(max(non_robot_distances))
+                best_sensor_idx = non_robot_indices[max_dist_idx]
+                
+                # Calculate turn angle based on sensor placement
+                if best_sensor_idx < len(self.proximity_sensor_placements):
+                    sensor_placement = self.proximity_sensor_placements[best_sensor_idx]
+                    # Turn toward the sensor with most clearance
+                    angle = sensor_placement.theta
+                else:
+                    # Default turn if we can't determine best direction
+                    angle = pi / 4
+            else:
+                # Default turn if no obstacle sensors found
+                angle = pi / 4
+        
         self._send_robot_commands(0, angle)
 
     def detect_obstacle(self):
-        return any(d < D_DANGER for d in self._forward_sensor_distances())
+        """
+        Detect obstacles (walls) but NOT robots.
+        Only returns True if sensors detect something that is NOT a robot.
+        """
+        forward_distances = self._forward_sensor_distances()
+        sensor_indices = list(range(1, min(8, len(self.proximity_sensor_distances))))
+        
+        # Check if any forward sensor detects an obstacle (not a robot)
+        for i, dist in enumerate(forward_distances):
+            if dist < D_DANGER:
+                sensor_idx = sensor_indices[i] if i < len(sensor_indices) else i + 1
+                # Only consider it an obstacle if it's NOT detecting a robot
+                if sensor_idx < len(self.robot_detection_sensor_array):
+                    if not self.robot_detection_sensor_array[sensor_idx]:
+                        return True
+        
+        return False
 
     def detect_robots_nearby(self):
         return any(self.robot_detection_sensor_array)
@@ -255,7 +357,7 @@ class SwarmForceBehavior:
         # save the current tick count for the next iteration
         self.prev_ticks_left = ticks_left
         self.prev_ticks_right = ticks_right
-
+    
     def _update_proximity_sensor_distances(self):
         self.proximity_sensor_distances = [
             0.02 - (log(readval / 3960.0)) / 30.0
