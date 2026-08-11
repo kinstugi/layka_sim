@@ -72,6 +72,7 @@ def build_frame_items(
     heading_length: float = DEFAULT_HEADING_LENGTH,
     grid_interval: float = DEFAULT_GRID_INTERVAL,
     trail: TrajectoryRecorder | None = None,
+    offset: tuple[float, float] = (0.0, 0.0),
 ) -> list[dict]:
     """Render a ``World`` into ``gui.Frame``-compatible drawing primitives.
 
@@ -79,10 +80,18 @@ def build_frame_items(
     returned list contains plain dicts with the keys the legacy ``Frame`` and
     ``Painter`` expect (``type``/``pos``/``radius``/``color``/``alpha`` for
     circles, ``type``/``lines``/``linewidth``/``color``/``alpha`` for lines).
+
+    ``offset`` is subtracted from every emitted coordinate. The legacy painter
+    maps the metric origin ``(0, 0)`` to the center of the window, while a
+    ``World`` keeps its robots in the positive quadrant ``[0, width] x
+    [0, height]``; passing ``offset=(width/2, height/2)`` re-centers the world
+    in the window instead of drawing it in the top-right quadrant.
     """
     _validate_positive("robot_radius", robot_radius)
     _validate_positive("heading_length", heading_length)
     _validate_positive("grid_interval", grid_interval)
+    if len(offset) != 2 or not all(math.isfinite(v) for v in offset):
+        raise ValueError(f"offset must be two finite numbers, got {offset!r}")
     if detection_range is not None and (
         not math.isfinite(detection_range) or detection_range <= 0
     ):
@@ -91,6 +100,11 @@ def build_frame_items(
             f"got {detection_range!r}"
         )
 
+    offset_x, offset_y = offset
+
+    def _p(x: float, y: float) -> list[float]:
+        return [x - offset_x, y - offset_y]
+
     width = world.width
     height = world.height
     items: list[dict] = []
@@ -98,11 +112,11 @@ def build_frame_items(
     grid_lines: list[list[list[float]]] = []
     x = 0.0
     while x <= width + 1e-12:
-        grid_lines.append([[x, 0.0], [x, height]])
+        grid_lines.append([_p(x, 0.0), _p(x, height)])
         x += grid_interval
     y = 0.0
     while y <= height + 1e-12:
-        grid_lines.append([[0.0, y], [width, y]])
+        grid_lines.append([_p(0.0, y), _p(width, y)])
         y += grid_interval
     if grid_lines:
         items.append(
@@ -116,10 +130,10 @@ def build_frame_items(
         )
 
     boundary = [
-        [[0.0, 0.0], [width, 0.0]],
-        [[width, 0.0], [width, height]],
-        [[width, height], [0.0, height]],
-        [[0.0, height], [0.0, 0.0]],
+        [_p(0.0, 0.0), _p(width, 0.0)],
+        [_p(width, 0.0), _p(width, height)],
+        [_p(width, height), _p(0.0, height)],
+        [_p(0.0, height), _p(0.0, 0.0)],
     ]
     items.append(
         {
@@ -136,7 +150,7 @@ def build_frame_items(
         for robot in world.robots:
             points = trail.positions(robot.robot_id)
             if len(points) >= 2:
-                trail_lines.append([[p.x, p.y] for p in points])
+                trail_lines.append([_p(p.x, p.y) for p in points])
         if trail_lines:
             items.append(
                 {
@@ -158,8 +172,8 @@ def build_frame_items(
                     other = world.robot_by_id(neighbor.neighbor_id)
                     link_lines.append(
                         [
-                            [robot.pose.x, robot.pose.y],
-                            [other.pose.x, other.pose.y],
+                            _p(robot.pose.x, robot.pose.y),
+                            _p(other.pose.x, other.pose.y),
                         ]
                     )
         if link_lines:
@@ -174,7 +188,7 @@ def build_frame_items(
             )
 
     for robot in world.robots:
-        pos = [robot.pose.x, robot.pose.y]
+        pos = _p(robot.pose.x, robot.pose.y)
         items.append(
             {
                 "type": "circle",
@@ -184,10 +198,10 @@ def build_frame_items(
                 "alpha": None,
             }
         )
-        heading_end = [
+        heading_end = _p(
             robot.pose.x + heading_length * math.cos(robot.pose.theta),
             robot.pose.y + heading_length * math.sin(robot.pose.theta),
-        ]
+        )
         items.append(
             {
                 "type": "lines",
@@ -208,6 +222,10 @@ class LaykaWorldView:
     ``current_frame`` with ``add_circle``/``add_lines``). ``debug`` toggles
     neighbor links and trails; ``draw_world_to_frame`` must be called between
     the viewer's ``new_frame()`` and ``draw_frame()`` calls.
+
+    With ``centered=True`` (default) the world is shifted so its center lands
+    on the painter's origin (the window center) rather than drawing the
+    positive-quadrant world in the top-right corner.
     """
 
     __slots__ = (
@@ -218,6 +236,7 @@ class LaykaWorldView:
         "_robot_radius",
         "_heading_length",
         "_trail",
+        "_centered",
     )
 
     def __init__(
@@ -230,6 +249,7 @@ class LaykaWorldView:
         robot_radius: float = DEFAULT_ROBOT_RADIUS,
         heading_length: float = DEFAULT_HEADING_LENGTH,
         trail: TrajectoryRecorder | None = None,
+        centered: bool = True,
     ) -> None:
         self._world = world
         self._viewer = viewer
@@ -238,6 +258,7 @@ class LaykaWorldView:
         self._robot_radius = robot_radius
         self._heading_length = heading_length
         self._trail = trail
+        self._centered = centered
 
     @property
     def world(self) -> World:
@@ -263,9 +284,18 @@ class LaykaWorldView:
         """Trajectory recorder used for trail rendering (read-only)."""
         return self._trail
 
+    @property
+    def centered(self) -> bool:
+        """Whether the world is re-centered on the painter origin."""
+        return self._centered
+
     def draw_world_to_frame(self) -> None:
         """Add all primitives for the current world state to the viewer frame."""
         frame = self._viewer.current_frame
+        if self._centered:
+            offset = (self._world.width / 2.0, self._world.height / 2.0)
+        else:
+            offset = (0.0, 0.0)
         for item in build_frame_items(
             self._world,
             debug=self._debug,
@@ -273,6 +303,7 @@ class LaykaWorldView:
             robot_radius=self._robot_radius,
             heading_length=self._heading_length,
             trail=self._trail,
+            offset=offset,
         ):
             if item["type"] == "circle":
                 frame.add_circle(

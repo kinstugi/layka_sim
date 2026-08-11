@@ -143,6 +143,61 @@ class TestTrails:
         assert not any(i["color"] == TRAIL_COLOR for i in _lines(items))
 
 
+class TestOffset:
+    def test_offset_shifts_all_coordinates(self):
+        world = _world_with(World(timestep=0.05), [(1.0, 1.0, 0.0), (4.0, 4.0, 0.0)])
+        items = build_frame_items(world, offset=(2.5, 2.5))
+        circles = _circles(items)
+        assert circles[0]["pos"] == [1.0 - 2.5, 1.0 - 2.5]
+        assert circles[1]["pos"] == [4.0 - 2.5, 4.0 - 2.5]
+        boundary = next(i for i in _lines(items) if i["color"] == BOUNDARY_COLOR)
+        segments = boundary["lines"]
+        # boundary corners should be re-centered: (0,0) -> (-2.5,-2.5), etc.
+        assert tuple(segments[0][0]) == (-2.5, -2.5)
+        assert tuple(segments[1][1]) == (2.5, 2.5)
+
+    def test_offset_default_is_world_coordinates(self):
+        world = _world_with(World(timestep=0.05), [(1.0, 1.0, 0.0)])
+        items = build_frame_items(world)
+        assert _circles(items)[0]["pos"] == [1.0, 1.0]
+
+    def test_invalid_offset(self):
+        world = World(timestep=0.05)
+        for bad in ((0.0, math.nan), (math.inf, 0.0), (1.0, 2.0, 3.0)):
+            with pytest.raises(ValueError):
+                build_frame_items(world, offset=bad)
+
+    def test_centered_view_emits_centered_coordinates(self):
+        world = _world_with(World(timestep=0.05), [(0.0, 0.0, 0.0)])
+        recorder = TrajectoryRecorder(max_points=5)
+        recorder.record(world)
+
+        class FakeViewer:
+            current_frame = None
+
+        class FakeFrame:
+            def __init__(self):
+                self.items = []
+
+            def add_circle(self, pos, radius, color, alpha):
+                self.items.append(("circle", pos))
+
+            def add_lines(self, lines, linewidth, color, alpha):
+                self.items.append(("lines", lines))
+
+        viewer = FakeViewer()
+        frame = FakeFrame()
+        viewer.current_frame = frame
+        from layka.sim_view import LaykaWorldView
+
+        view = LaykaWorldView(world, viewer, trail=recorder)
+        view.draw_world_to_frame()
+        assert view.centered
+        circles = [i for i in frame.items if i[0] == "circle"]
+        # world center (2.5, 2.5) subtracted from the robot at (0,0)
+        assert circles[0][1] == [-2.5, -2.5]
+
+
 class TestPurityAndValidation:
     def test_world_not_mutated(self):
         world = _world_with(World(timestep=0.05), [(1.0, 1.0, 0.0)])

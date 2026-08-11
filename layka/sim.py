@@ -123,9 +123,28 @@ class LaykaSimController:
             detection_range=self._search_config.detection_range,
             trail=self.trajectory,
         )
+        self._fit_viewport()
 
         # render the initial world
         self.draw_world()
+
+    def _fit_viewport(self) -> None:
+        """Scale the painter so the whole world fits in the drawing area.
+
+        The legacy painter uses a fixed 100 px/m zoom and maps the metric
+        origin to the window center, so a world larger than half the view
+        (or one offset from the origin) would be cut off. Recompute the zoom
+        from the drawing-area size so every robot stays visible.
+        """
+        available_w = self.viewer.view_width_pixels
+        available_h = self.viewer.view_height_pixels
+        margin_px = 40.0
+        zoom = min(
+            (available_w - margin_px) / self.world.width,
+            (available_h - margin_px) / self.world.height,
+        )
+        self.viewer.pixels_per_meter = zoom
+        self.viewer.painter.pixels_per_meter = zoom
 
     def _make_behavior(
         self,
