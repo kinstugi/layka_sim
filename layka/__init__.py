@@ -13,12 +13,17 @@ M2.7 deterministic two-robot experiment (``run_two_robot_experiment`` /
 ``TwoRobotResult``), and the M2.8 deterministic multi-robot aggregation
 experiment (``run_aggregation_experiment`` / ``AggregationResult``).
 M2.9 adds the SEARCH <-> SWARM state-machine behavior for isolated robots
-(``SearchSwarmBehavior`` / ``SearchSwarmConfig``).
+(``SearchSwarmBehavior`` / ``SearchSwarmConfig``). The simulator wiring adds
+the world-boundary containment wrapper (``BoundaryContainmentBehavior``), the
+headless frame-primitive builder for the GTK renderer (``build_frame_items``),
+and its thin viewer glue (``LaykaWorldView``); the GTK entry point itself
+lives in ``layka.sim`` (imports ``gi``, so it is not re-exported here).
 Pure Python: no GTK/PyGObject dependency, so it imports headlessly for
 tests and experiments.
 """
 
 from layka.behavior import Behavior, StationaryBehavior, TrivialMotionBehavior
+from layka.boundary import BoundaryContainmentBehavior
 from layka.clock import SimulationClock
 from layka.config import LennardJonesConfig, SimulationConfig
 from layka.experiments import (
@@ -48,6 +53,7 @@ from layka.pose import Pose2D, normalize_angle
 from layka.renderer import DebugRenderer, TrajectoryRecorder, heading_arrow
 from layka.robot import RobotConfig, RobotState
 from layka.search_behavior import SearchSwarmBehavior, SearchSwarmConfig
+from layka.sim_view import LaykaWorldView, build_frame_items
 from layka.vector import Vector2
 from layka.world import World
 
@@ -55,12 +61,14 @@ __all__ = [
     "AggregationResult",
     "Behavior",
     "BodyVelocity",
+    "BoundaryContainmentBehavior",
     "DebugRenderer",
     "DifferentialDriveRobot",
     "LJBehavior",
     "LJController",
     "LJControllerConfig",
     "LJInteraction",
+    "LaykaWorldView",
     "LennardJonesConfig",
     "Neighbor",
     "NeighborSensor",
@@ -79,6 +87,7 @@ __all__ = [
     "WheelSpeeds",
     "World",
     "body_to_wheels",
+    "build_frame_items",
     "clamp",
     "heading_arrow",
     "integrate_pose",
