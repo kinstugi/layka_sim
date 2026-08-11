@@ -9,6 +9,8 @@ dependencies = [
     # The GTK UI. On most systems this needs the OS GTK3 / gobject-introspection
     # development packages to install; see docs/installation.md.
     "PyGObject>=3.42,<4",
+    # Validated configuration models in the layka package (M1.3).
+    "pydantic>=2",
 ]
 
 [dependency-groups]
@@ -27,6 +29,9 @@ build-backend = "setuptools.build_meta"
 # root with `python simulator.py`.
 [tool.setuptools]
 py-modules = ["simulator"]
+
+[tool.setuptools.packages.find]
+include = ["layka*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
