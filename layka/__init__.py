@@ -1,4 +1,4 @@
-"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6 / M1.7 / M1.8 / M2.1 / M2.2 / M2.4 / M2.5 / M2.6).
+"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6 / M1.7 / M1.8 / M2.1 / M2.2 / M2.4 / M2.5 / M2.6 / M2.7).
 
 Re-exports the public typed models, the explicit simulation clock, the
 differential-drive kinematics, the minimal robot behavior abstraction, the
@@ -7,15 +7,17 @@ debug renderer, the pure Lennard-Jones potential/force functions, the
 M2.2 numerical-safety guards (min-distance clamp, force clamp, cutoff,
 finite checks), the M2.4 2D assembly of pairwise LJ forces into
 resultant vectors, the M2.5 LJ interaction component (poses ->
-resultant vector, no side effects), and the M2.6 LJ controller (resultant
-vector -> body velocity (v, omega)) plus its LJBehavior wrapper. Pure
-Python: no GTK/PyGObject dependency, so it imports headlessly for tests
-and experiments.
+resultant vector, no side effects), the M2.6 LJ controller (resultant
+vector -> body velocity (v, omega)) plus its LJBehavior wrapper, and the
+M2.7 deterministic two-robot experiment (``run_two_robot_experiment`` /
+``TwoRobotResult``). Pure Python: no GTK/PyGObject dependency, so it
+imports headlessly for tests and experiments.
 """
 
 from layka.behavior import Behavior, StationaryBehavior, TrivialMotionBehavior
 from layka.clock import SimulationClock
 from layka.config import LennardJonesConfig, SimulationConfig
+from layka.experiments import TwoRobotResult, run_two_robot_experiment
 from layka.kinematics import (
     BodyVelocity,
     DifferentialDriveRobot,
@@ -59,6 +61,7 @@ __all__ = [
     "StationaryBehavior",
     "TrajectoryRecorder",
     "TrivialMotionBehavior",
+    "TwoRobotResult",
     "Vector2",
     "WheelSpeeds",
     "World",
@@ -71,6 +74,7 @@ __all__ = [
     "normalize_angle",
     "pairwise_lj_force",
     "resultant_lj_force",
+    "run_two_robot_experiment",
     "safe_lj_force",
     "safe_lj_potential",
     "wheels_to_body",
