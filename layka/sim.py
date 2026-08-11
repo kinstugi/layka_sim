@@ -43,13 +43,14 @@ from gi.repository import GLib
 from gi.repository import Gtk
 
 import gui.viewer  # noqa: E402  (reused generic GTK chrome; display required)
+from layka.boundary import BoundaryContainmentBehavior
 from layka.config import LennardJonesConfig, SimulationConfig
 from layka.lj_controller import LJController, LJControllerConfig
 from layka.obstacle import Obstacle
 from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
+from layka.proximity_sensor import ProximitySensorConfig, compute_sensor_readings
 from layka.renderer import TrajectoryRecorder
 from layka.search_behavior import SearchSwarmBehavior, SearchSwarmConfig
-from layka.boundary import BoundaryContainmentBehavior
 from layka.sim_view import LaykaWorldView
 from layka.vector import Vector2
 from layka.world import World
@@ -101,6 +102,9 @@ class LaykaSimController:
 
         # GTK simulation event source
         self.sim_event_source = GLib.idle_add(self.initialize_sim, True)
+
+        # IR proximity sensors (ray-cast cone rendering)
+        self._sensor_config = ProximitySensorConfig()
 
         # start the GTK main loop
         Gtk.main()
@@ -240,6 +244,10 @@ class LaykaSimController:
         self.viewer.new_frame()
         # The legacy "Show Invisibles" button doubles as the debug toggle.
         self.world_view.debug = self.viewer.show_invisibles
+        # Fresh IR sensor readings so the red/green cones track the world.
+        self.world_view.sensor_readings = compute_sensor_readings(
+            self.world, self._sensor_config
+        )
         self.world_view.draw_world_to_frame()
         self.viewer.draw_frame()
 

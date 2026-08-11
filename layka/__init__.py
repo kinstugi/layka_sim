@@ -57,6 +57,11 @@ from layka.neighbors import Neighbor, NeighborSensor
 from layka.obstacle import Obstacle
 from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
 from layka.pose import Pose2D, normalize_angle
+from layka.proximity_sensor import (
+    ProximitySensorConfig,
+    SensorReading,
+    compute_sensor_readings,
+)
 from layka.renderer import DebugRenderer, TrajectoryRecorder, heading_arrow
 from layka.robot import RobotConfig, RobotState
 from layka.search_behavior import SearchSwarmBehavior, SearchSwarmConfig
@@ -82,10 +87,12 @@ __all__ = [
     "Obstacle",
     "ObstacleAvoidanceBehavior",
     "Pose2D",
+    "ProximitySensorConfig",
     "RobotConfig",
     "RobotState",
     "SearchSwarmBehavior",
     "SearchSwarmConfig",
+    "SensorReading",
     "SimulationClock",
     "SimulationConfig",
     "StationaryBehavior",
@@ -98,6 +105,7 @@ __all__ = [
     "body_to_wheels",
     "build_frame_items",
     "clamp",
+    "compute_sensor_readings",
     "heading_arrow",
     "integrate_pose",
     "lennard_jones_force",
