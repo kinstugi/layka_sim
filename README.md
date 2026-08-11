@@ -19,27 +19,27 @@ Sobot Rimulator is inspired by [Sim.I.Am](http://jpdelacroix.com/software/simiam
 
 ### Requirements
 
-Sobot Rimulator requires Python 3. Its main dependencies are [Gtk 3](https://www.gtk.org/) and [PyGObject 3](https://pygobject.readthedocs.io/en/latest/index.html), which are used for the UI.
+Sobot Rimulator requires Python 3 (>= 3.10) and [Gtk 3](https://www.gtk.org/)
+with [PyGObject 3](https://pygobject.readthedocs.io/en/latest/index.html) for
+the UI. PyGObject is the only Python runtime dependency; it needs the system
+GTK3 / gobject-introspection development packages to install.
 
-If you are using `pip` you will need to add Gtk3 to your environment separately since it is not a Python library. If you are using `conda` you can create a new environment with everything you need like this:
-
-```
-conda create -n sobot-rimulator -c conda-forge python=3 gtk3 pygobject
-```
-
-Then to switch to the new environment:
-
-```
-conda activate sobot-rimulator
-```
+See [docs/installation.md](docs/installation.md) for the full installation
+procedure (both `uv` and `pip` + `venv` paths), the required system packages,
+and how to run the tests.
 
 ### Running the Simulator
 
 From the command line, navigate to the project's root directory. Then type:
 
 ```
-python simulator.py
+uv run python simulator.py
 ```
+
+(or `python simulator.py` inside an activated virtual environment).
+
+Note: the simulator is a GTK application and requires a display; without one
+it exits at startup. The test suite does not require a display.
 
 ## User Interface
 

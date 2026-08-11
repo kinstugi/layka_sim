@@ -1,9 +1,19 @@
 # Local files you use to do your work can go here.
 .local
 
+# Virtual environments.
+.venv/
+
 # Compiled Python files.
 *.pyc
+__pycache__/
 
 # Text editor backups.
 *.py~
 *.swp
+
+# Test and build artifacts.
+.pytest_cache/
+*.egg-info/
+build/
+dist/

@@ -1,0 +1,33 @@
+[project]
+name = "layka-sim"
+version = "0.1.0"
+description = "Multi-robot simulator (Sobot Rimulator fork) with Layka robots and Lennard-Jones swarm behavior."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+dependencies = [
+    # The GTK UI. On most systems this needs the OS GTK3 / gobject-introspection
+    # development packages to install; see docs/installation.md.
+    "PyGObject>=3.42,<4",
+]
+
+[dependency-groups]
+# Development-only dependencies (installed by `uv sync` by default).
+dev = [
+    "pytest>=8",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+# The repo is a script-based application, not a Python package: the only
+# importable module at the root is simulator.py. The wheel built here is a
+# vehicle for dependency metadata; the app itself always runs from the repo
+# root with `python simulator.py`.
+[tool.setuptools]
+py-modules = ["simulator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
