@@ -1,11 +1,20 @@
-"""Unit tests for M2.4: pairwise LJ forces assembled into 2D vectors.
+"""Unit tests for M2.4 (pairwise/resultant LJ force vectors) and M2.5 (the
+LJInteraction component: poses -> resultant vector).
 
-Covers the plan.md M2.4 acceptance criteria: one neighbor to the left, one
-neighbor to the right, one neighbor above, two symmetric neighbors
+M2.4 coverage follows the plan.md acceptance criteria: one neighbor to the
+left, one neighbor to the right, one neighbor above, two symmetric neighbors
 (attractive and repulsive regions), three asymmetric neighbors, co-located
 robots (r == 0), empty neighbor lists, magnitude/sign sanity against
 ``safe_lj_force``, M2.2 clamp integration, determinism, and controller
-independence (the module imports no robot/world/controller code).
+independence (the pure functions import no robot/world/controller code).
+
+M2.5 coverage checks that ``LJInteraction`` delegates to the M2.4 functions,
+returns the same vectors for single/multiple/empty neighbor lists, keeps the
+attractive/repulsive sign convention, is deterministic, has no side effects
+(inputs unchanged, returns only a Vector2 -- it never sets wheel velocities;
+motion is the M2.6 controller's job), and that ``compute_from_neighbors``
+reconstructs absolute positions from ``Neighbor.relative_position`` (a
+world-frame displacement per M1.7).
 
 Sign convention (pinned here): the M2.1 scalar ``f = -dV/dr`` is positive-
 repulsive / negative-attractive and acts in the direction of increasing
@@ -28,8 +37,14 @@ import math
 import pytest
 
 from layka.config import LennardJonesConfig
-from layka.lj_interaction import pairwise_lj_force, resultant_lj_force
+from layka.lj_interaction import (
+    LJInteraction,
+    pairwise_lj_force,
+    resultant_lj_force,
+)
 from layka.lj_safety import safe_lj_force
+from layka.neighbors import Neighbor
+from layka.pose import Pose2D
 from layka.vector import Vector2
 import layka.lj_interaction as lj_interaction
 
@@ -253,17 +268,19 @@ def test_pairwise_and_resultant_are_deterministic():
 
 def test_module_imports_no_robot_world_or_controller_code():
     source = inspect.getsource(lj_interaction)
+    # "pose" and "neighbors" are deliberately NOT in the forbidden list: the
+    # M2.5 LJInteraction component (same module) consumes Pose2D poses and
+    # Neighbor records. The remaining tokens pin the M2.4 invariant that the
+    # LJ math never couples to robot/controller/world/kinematics/UI code.
     forbidden = (
         "robot",
         "world",
         "behavior",
         "controller",
         "kinematics",
-        "neighbors",
         "renderer",
         "gui",
         "view",
-        "pose",
     )
     for line in source.splitlines():
         stripped = line.strip()
@@ -271,3 +288,161 @@ def test_module_imports_no_robot_world_or_controller_code():
             assert not any(token in stripped for token in forbidden), (
                 f"unexpected dependency in layka/lj_interaction.py: {stripped!r}"
             )
+
+
+# --- M2.5 LJInteraction component ---
+
+
+def make_component() -> LJInteraction:
+    return LJInteraction(CONFIG)
+
+
+# --- single neighbors: component delegates to the M2.4 pure functions ---
+
+
+def test_component_single_neighbor_left_matches_pairwise_force():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbor = Pose2D(-R_ATTRACTIVE, 0.0, 0.0)
+    expected = pairwise_lj_force(self_pose.position(), neighbor.position(), CONFIG)
+    assert_vec_approx(component.compute(self_pose, [neighbor]), expected)
+
+
+def test_component_single_neighbor_right_matches_pairwise_force():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbor = Pose2D(R_ATTRACTIVE, 0.0, 0.0)
+    expected = pairwise_lj_force(self_pose.position(), neighbor.position(), CONFIG)
+    assert_vec_approx(component.compute(self_pose, [neighbor]), expected)
+
+
+def test_component_single_neighbor_above_matches_pairwise_force():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbor = Pose2D(0.0, R_ATTRACTIVE, 0.0)
+    expected = pairwise_lj_force(self_pose.position(), neighbor.position(), CONFIG)
+    assert_vec_approx(component.compute(self_pose, [neighbor]), expected)
+
+
+# --- multiple / empty neighbor lists ---
+
+
+def test_component_multiple_neighbors_matches_resultant_force():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbors = [
+        Pose2D(-R_ATTRACTIVE, 0.0, 0.0),
+        Pose2D(0.0, R_ATTRACTIVE, 0.0),
+        Pose2D(0.3, 0.4, 0.0),
+        Pose2D(0.2, -0.2, 0.0),
+    ]
+    expected = resultant_lj_force(
+        self_pose.position(), [n.position() for n in neighbors], CONFIG
+    )
+    assert_vec_approx(component.compute(self_pose, neighbors), expected)
+
+
+def test_component_empty_neighbor_list_is_zero_vector():
+    component = make_component()
+    assert component.compute(Pose2D(0.0, 0.0, 0.0), []) == Vector2(0.0, 0.0)
+
+
+# --- sign convention preserved (M2.4 sign, reviewer-verified) ---
+
+
+def test_component_repulsive_neighbor_points_away():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbor = Pose2D(R_REPULSIVE, 0.0, 0.0)
+    result = component.compute(self_pose, [neighbor])
+    direction = neighbor.position() - self_pose.position()  # self -> other
+    assert result.dot(direction) < 0  # opposite the direction: AWAY
+    assert_vec_approx(
+        result, pairwise_lj_force(self_pose.position(), neighbor.position(), CONFIG)
+    )
+
+
+def test_component_attractive_neighbor_points_toward():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbor = Pose2D(R_ATTRACTIVE, 0.0, 0.0)
+    result = component.compute(self_pose, [neighbor])
+    direction = neighbor.position() - self_pose.position()  # self -> other
+    assert result.dot(direction) > 0  # along the direction: TOWARD
+    assert_vec_approx(
+        result, pairwise_lj_force(self_pose.position(), neighbor.position(), CONFIG)
+    )
+
+
+# --- separation of concerns: returns a vector, no side effects, no motion ---
+
+
+def test_component_returns_vector2_and_does_not_mutate_inputs():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.5)
+    neighbor = Pose2D(R_ATTRACTIVE, 0.0, -0.3)
+    result = component.compute(self_pose, [neighbor])
+    # The component's contract: it returns a Vector2 (a desired interaction
+    # vector), NOT a velocity, wheel speed, or RobotState. Motion is the
+    # M2.6 controller's job; the component never sets it.
+    assert isinstance(result, Vector2)
+    assert result == resultant_lj_force(
+        self_pose.position(), [neighbor.position()], CONFIG
+    )
+    # No side effects: input poses (position AND heading) are unchanged.
+    assert self_pose == Pose2D(0.0, 0.0, 0.5)
+    assert neighbor == Pose2D(R_ATTRACTIVE, 0.0, -0.3)
+
+
+def test_component_is_deterministic_across_repeated_calls():
+    component = make_component()
+    self_pose = Pose2D(0.0, 0.0, 0.0)
+    neighbors = [
+        Pose2D(-R_ATTRACTIVE, 0.0, 0.0),
+        Pose2D(0.3, 0.4, 0.0),
+        Pose2D(0.2, -0.2, 0.0),
+    ]
+    first = component.compute(self_pose, neighbors)
+    for _ in range(5):
+        assert component.compute(self_pose, neighbors) == first
+
+
+def test_component_exposes_readonly_config():
+    component = make_component()
+    assert component.config is CONFIG
+    assert component.config.sigma == pytest.approx(CONFIG.sigma)
+    assert component.config.equilibrium_distance == pytest.approx(CONFIG.equilibrium_distance)
+
+
+# --- compute_from_neighbors: Neighbor records -> same vector as poses ---
+
+
+def test_component_from_neighbors_matches_equivalent_absolute_poses():
+    component = make_component()
+    self_pose = Pose2D(1.0, -2.0, 0.0)
+    neighbor_poses = [
+        Pose2D(1.0 + R_ATTRACTIVE, -2.0, 0.0),
+        Pose2D(1.0 - R_REPULSIVE, -2.0, 0.0),
+        Pose2D(1.0 + 0.3, -2.0 + 0.4, 0.0),
+    ]
+    neighbors = [
+        Neighbor(
+            neighbor_id=i,
+            relative_position=n.position() - self_pose.position(),
+            distance=(n.position() - self_pose.position()).norm(),
+        )
+        for i, n in enumerate(neighbor_poses)
+    ]
+    # relative_position is a world-frame displacement (M1.7), so reconstructing
+    # absolute positions and delegating must equal the direct pose path.
+    assert_vec_approx(
+        component.compute_from_neighbors(self_pose, neighbors),
+        component.compute(self_pose, neighbor_poses),
+    )
+
+
+def test_component_from_neighbors_empty_is_zero_vector():
+    component = make_component()
+    assert component.compute_from_neighbors(Pose2D(0.0, 0.0, 0.0), []) == Vector2(
+        0.0, 0.0
+    )

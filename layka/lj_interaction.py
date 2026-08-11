@@ -1,4 +1,5 @@
-"""Pairwise Lennard-Jones interaction as 2D vectors (M2.4).
+"""Pairwise Lennard-Jones interaction as 2D vectors (M2.4) and the
+interaction component that assembles them (M2.5).
 
 For a robot at ``self_position`` and a neighbor at ``other_position``:
 
@@ -28,18 +29,29 @@ With multiple neighbors the contributions are additive (superposition):
 
     F_A = sum(F_AB) over all neighbors B
 
-This module is a pure geometric/math component: it produces a resultant
-VECTOR and knows nothing about robot controllers, kinematics, the world, or
-rendering (independence required by plan.md M2.4). Configuring/selecting the
-force is M2.5, converting the vector to robot motion is M2.6.
+The functions above are pure geometric/math: they produce a resultant VECTOR
+and know nothing about robot controllers, kinematics, the world, or rendering
+(independence required by plan.md M2.4).
+
+The :class:`LJInteraction` component (M2.5) is the thin orchestration layer on
+top: it receives the self pose and already-detected neighbor poses (detection
+is :class:`layka.neighbors.NeighborSensor`'s job, M1.7) and returns the
+resultant vector computed by :func:`resultant_lj_force`. It has NO side
+effects -- it never mutates poses/robots/world and never sets wheel
+velocities or any robot motion. Converting the resultant vector into
+``(v, omega)`` is the controller's job (M2.6), and the robot model performs
+the kinematic integration. This three-way split (interaction vector ->
+controller -> kinematics) is the M2.x separation of concerns.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from layka.config import LennardJonesConfig
 from layka.lj_safety import safe_lj_force
+from layka.neighbors import Neighbor
+from layka.pose import Pose2D
 from layka.vector import Vector2
 
 
@@ -84,3 +96,68 @@ def resultant_lj_force(
     for other_position in other_positions:
         total = total + pairwise_lj_force(self_position, other_position, config)
     return total
+
+
+class LJInteraction:
+    """M2.5 component: neighbor poses -> resultant LJ interaction vector.
+
+    Consumes already-detected neighbor poses (detection is
+    :class:`layka.neighbors.NeighborSensor`'s job, M1.7) and computes the
+    resultant LJ vector by delegating to :func:`resultant_lj_force` (the pure
+    M2.4 math).
+
+    This component is deliberately side-effect free: it never mutates poses,
+    robots, or the world, and it never sets wheel velocities or any robot
+    motion. The resultant vector is a desired interaction direction/speed
+    input for the controller; converting it into ``(v, omega)`` is the
+    controller's responsibility (M2.6), not this component's.
+    """
+
+    __slots__ = ("_config",)
+
+    def __init__(self, config: LennardJonesConfig) -> None:
+        self._config = config
+
+    @property
+    def config(self) -> LennardJonesConfig:
+        """The LJ configuration this component was created with (read-only)."""
+        return self._config
+
+    def compute(
+        self,
+        self_pose: Pose2D,
+        neighbor_poses: Sequence[Pose2D],
+    ) -> Vector2:
+        """Resultant LJ interaction vector on ``self_pose`` over ``neighbor_poses``.
+
+        Delegates to ``resultant_lj_force`` (M2.4) with the world-frame
+        positions of the self pose and each neighbor pose. An empty neighbor
+        list yields the zero vector. Deterministic: identical inputs produce
+        identical results across repeated calls.
+        """
+        return resultant_lj_force(
+            self_pose.position(),
+            (neighbor.position() for neighbor in neighbor_poses),
+            self._config,
+        )
+
+    def compute_from_neighbors(
+        self,
+        self_pose: Pose2D,
+        neighbors: Sequence[Neighbor],
+    ) -> Vector2:
+        """Like :meth:`compute` but consumes ``Neighbor`` records (M1.7).
+
+        Absolute neighbor positions are reconstructed as
+        ``self_position + neighbor.relative_position``. Per M1.7's convention
+        ``Neighbor.relative_position`` is a world-frame displacement (NOT a
+        body-frame vector), so this sum is exact world-frame addition and the
+        result equals passing the equivalent absolute poses to
+        :meth:`compute`.
+        """
+        self_position = self_pose.position()
+        return resultant_lj_force(
+            self_position,
+            (self_position + neighbor.relative_position for neighbor in neighbors),
+            self._config,
+        )
