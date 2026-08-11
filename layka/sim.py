@@ -7,12 +7,16 @@ cairo painter) but the simulation itself is built entirely from the clean
 
     World (M1.6) + SimulationClock (M1.4) + kinematics (M1.5)
     + NeighborSensor (M1.7) + LJ interaction (M2.1-M2.5)
-    + SearchSwarmBehavior (M2.9) + BoundaryContainmentBehavior (wiring)
+    + SearchSwarmBehavior (M2.9) + ObstacleAvoidanceBehavior (M2.10)
+    + BoundaryContainmentBehavior (wiring)
 
-Robots run ``SearchSwarmBehavior`` wrapped in ``BoundaryContainmentBehavior``:
+Robots run ``SearchSwarmBehavior`` wrapped in ``ObstacleAvoidanceBehavior``
+and ``BoundaryContainmentBehavior`` (priority: boundary containment =
+collision safety outermost, obstacle avoidance next, swarm innermost):
 isolated robots patrol until they detect a neighbor, then aggregate via the
-Lennard-Jones interaction; the boundary wrapper keeps robots from leaving the
-visible world (stopgap until M2.10's obstacle interaction).
+Lennard-Jones interaction; the avoidance wrapper steers robots away from the
+world's static circular obstacles (M2.10) and the boundary wrapper keeps
+robots from leaving the visible world.
 
 Rendering is decoupled from the clock exactly as M1.4 intended: the GLib
 timeout simply calls ``world.step()`` (advancing the explicit ``dt = 0.05``)
@@ -41,10 +45,13 @@ from gi.repository import Gtk
 import gui.viewer  # noqa: E402  (reused generic GTK chrome; display required)
 from layka.config import LennardJonesConfig, SimulationConfig
 from layka.lj_controller import LJController, LJControllerConfig
+from layka.obstacle import Obstacle
+from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
 from layka.renderer import TrajectoryRecorder
 from layka.search_behavior import SearchSwarmBehavior, SearchSwarmConfig
 from layka.boundary import BoundaryContainmentBehavior
 from layka.sim_view import LaykaWorldView
+from layka.vector import Vector2
 from layka.world import World
 
 REFRESH_RATE = 20.0  # hertz
@@ -55,6 +62,24 @@ WORLD_WIDTH = 5.0
 WORLD_HEIGHT = 5.0
 DEFAULT_SEED = 42
 BOUNDARY_MARGIN = 0.3  # m from each edge that triggers containment
+OBSTACLE_CLEARANCE = 0.15  # m beyond an obstacle's radius that triggers avoidance
+
+
+def _default_obstacles() -> list[Obstacle]:
+    """Static circular obstacles placed around the 5 x 5 m demo world.
+
+    Placement tuned empirically for the default seed 42 (M2.10): the plan's
+    sketch placement ((1.5, 1.5, r=0.4), (3.5, 3.5, r=0.5), (2.5, 1.0, r=0.3))
+    puts the seed-42 spawn at (2.725, 1.102) INSIDE the (2.5, 1.0) obstacle
+    and splits the swarm into two non-aggregating clusters. These obstacles
+    sit at the left/right mid-height and the top edge instead: they perturb
+    search patrols (avoidance is exercised) without blocking aggregation.
+    """
+    return [
+        Obstacle(Vector2(1.0, 2.5), 0.3),
+        Obstacle(Vector2(4.2, 2.5), 0.3),
+        Obstacle(Vector2(2.5, 4.2), 0.25),
+    ]
 
 
 class LaykaSimController:
@@ -113,6 +138,8 @@ class LaykaSimController:
                     controller_config, search_config, lj_config
                 )
             )
+        for obstacle in _default_obstacles():
+            self.world.add_obstacle(obstacle)
 
         self.trajectory = TrajectoryRecorder(max_points=200)
         self.trajectory.record(self.world)
@@ -152,19 +179,28 @@ class LaykaSimController:
         search_config: SearchSwarmConfig,
         lj_config: LennardJonesConfig,
     ) -> BoundaryContainmentBehavior:
-        """Fresh search+swarm behavior wrapped in world-boundary containment.
+        """Fresh search+swarm behavior wrapped in obstacle avoidance (M2.10)
+        and world-boundary containment.
 
-        A fresh instance per robot: ``SearchSwarmBehavior`` keeps per-robot
-        state (current state + patrol timer). The controller/config objects are
-        stateless and shared.
+        Priority (plan.md M2.10): collision safety > obstacle avoidance >
+        swarm interaction, so the boundary wrapper (collision safety) is
+        OUTERMOST, obstacle avoidance is next, and the swarm behavior is
+        innermost. A fresh instance per robot: ``SearchSwarmBehavior`` keeps
+        per-robot state (current state + patrol timer). The controller/config
+        objects are stateless and shared.
         """
         inner = SearchSwarmBehavior.from_config(
             search_config=search_config,
             controller_config=controller_config,
             lj_config=lj_config,
         )
-        return BoundaryContainmentBehavior(
+        avoidance = ObstacleAvoidanceBehavior(
             inner,
+            LJController(controller_config),
+            clearance=OBSTACLE_CLEARANCE,
+        )
+        return BoundaryContainmentBehavior(
+            avoidance,
             LJController(controller_config),
             self.world.width,
             self.world.height,

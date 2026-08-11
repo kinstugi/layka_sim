@@ -32,6 +32,7 @@ from layka.behavior import Behavior, StationaryBehavior
 from layka.clock import SimulationClock
 from layka.config import SimulationConfig
 from layka.kinematics import integrate_pose
+from layka.obstacle import Obstacle
 from layka.pose import Pose2D
 from layka.robot import RobotState
 
@@ -43,7 +44,13 @@ DEFAULT_WORLD_HEIGHT = 5.0
 
 
 class World:
-    """A 2D world holding multiple robots and a simulation clock."""
+    """A 2D world holding multiple robots, static circular obstacles, and a
+    simulation clock.
+
+    Obstacles (M2.10) are static read-only geometry: they never participate in
+    robot updates, neighbor queries, or the LJ interaction; behaviors read
+    ``world.obstacles`` themselves (Rule 5).
+    """
 
     __slots__ = (
         "_config",
@@ -51,6 +58,7 @@ class World:
         "_rng",
         "_robots",
         "_behaviors",
+        "_obstacles",
         "_next_id",
         "_world_width",
         "_world_height",
@@ -90,6 +98,7 @@ class World:
         self._rng = random.Random(effective_seed)
         self._robots: dict[int, RobotState] = {}
         self._behaviors: dict[int, Behavior] = {}
+        self._obstacles: list[Obstacle] = []
         self._next_id = 0
 
     # --- robot management ---
@@ -145,6 +154,22 @@ class World:
             y=self._rng.uniform(0.0, self._world_height),
             theta=self._rng.uniform(-math.pi, math.pi),
         )
+
+    # --- obstacle management (M2.10) ---
+
+    def add_obstacle(self, obstacle: Obstacle) -> None:
+        """Add one static circular obstacle to the world.
+
+        Obstacles are read-only static geometry: they never participate in
+        robot updates, neighbor queries (``NeighborSensor`` only iterates
+        ``world.robots``), or the LJ interaction, and nothing ever mutates
+        them. ``step()`` needs no obstacle logic because behaviors read
+        ``world.obstacles`` themselves (Rule 5: separation of physics and
+        control).
+        """
+        if not isinstance(obstacle, Obstacle):
+            raise TypeError(f"obstacle must be an Obstacle, got {obstacle!r}")
+        self._obstacles.append(obstacle)
 
     # --- simulation step ---
 
@@ -226,6 +251,20 @@ class World:
     def robot_count(self) -> int:
         """Number of robots currently in the world."""
         return len(self._robots)
+
+    @property
+    def obstacles(self) -> tuple[Obstacle, ...]:
+        """Read-only snapshot of all obstacles, in insertion order.
+
+        A fresh tuple copy is returned on every access (the ``Obstacle``
+        objects themselves are frozen, so the snapshot is immutable).
+        """
+        return tuple(self._obstacles)
+
+    @property
+    def obstacle_count(self) -> int:
+        """Number of obstacles currently in the world."""
+        return len(self._obstacles)
 
     def __len__(self) -> int:
         return len(self._robots)

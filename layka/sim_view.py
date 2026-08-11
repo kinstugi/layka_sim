@@ -11,6 +11,8 @@ What gets drawn, in order (later items on top):
 
 - a light-gray grid at ``grid_interval`` meter spacing;
 - the world boundary rectangle;
+- each static circular obstacle (M2.10) as a filled dark-gray circle
+  (obstacles render BEFORE robots so robots draw on top);
 - each robot's recent trajectory (when a :class:`TrajectoryRecorder` is
   supplied) as a steel-blue polyline;
 - neighbor links (only in debug mode, via
@@ -46,6 +48,7 @@ DEFAULT_HEADING_LENGTH = 0.12
 
 GRID_COLOR = "lightgray"
 BOUNDARY_COLOR = "dimgray"
+OBSTACLE_COLOR = "darkgray"
 ROBOT_COLOR = "royal blue"
 HEADING_COLOR = "red"
 TRAIL_COLOR = "steel blue"
@@ -73,6 +76,7 @@ def build_frame_items(
     grid_interval: float = DEFAULT_GRID_INTERVAL,
     trail: TrajectoryRecorder | None = None,
     offset: tuple[float, float] = (0.0, 0.0),
+    obstacle_color: str = OBSTACLE_COLOR,
 ) -> list[dict]:
     """Render a ``World`` into ``gui.Frame``-compatible drawing primitives.
 
@@ -144,6 +148,17 @@ def build_frame_items(
             "alpha": None,
         }
     )
+
+    for obstacle in world.obstacles:
+        items.append(
+            {
+                "type": "circle",
+                "pos": _p(obstacle.center.x, obstacle.center.y),
+                "radius": obstacle.radius,
+                "color": obstacle_color,
+                "alpha": None,
+            }
+        )
 
     if trail is not None:
         trail_lines: list[list[list[float]]] = []

@@ -18,6 +18,11 @@ the world-boundary containment wrapper (``BoundaryContainmentBehavior``), the
 headless frame-primitive builder for the GTK renderer (``build_frame_items``),
 and its thin viewer glue (``LaykaWorldView``); the GTK entry point itself
 lives in ``layka.sim`` (imports ``gi``, so it is not re-exported here).
+M2.10 adds static circular obstacles (``Obstacle``), world storage for them
+(``World.add_obstacle`` / ``World.obstacles`` / ``World.obstacle_count``),
+and the ``ObstacleAvoidanceBehavior`` wrapper that overrides the inner swarm
+command with a steer-away command near an obstacle (obstacles are world
+geometry, never robots: they never enter the neighbor/LJ pipeline).
 Pure Python: no GTK/PyGObject dependency, so it imports headlessly for
 tests and experiments.
 """
@@ -49,6 +54,8 @@ from layka.lj_interaction import (
 )
 from layka.lj_safety import clamp, safe_lj_force, safe_lj_potential
 from layka.neighbors import Neighbor, NeighborSensor
+from layka.obstacle import Obstacle
+from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
 from layka.pose import Pose2D, normalize_angle
 from layka.renderer import DebugRenderer, TrajectoryRecorder, heading_arrow
 from layka.robot import RobotConfig, RobotState
@@ -72,6 +79,8 @@ __all__ = [
     "LennardJonesConfig",
     "Neighbor",
     "NeighborSensor",
+    "Obstacle",
+    "ObstacleAvoidanceBehavior",
     "Pose2D",
     "RobotConfig",
     "RobotState",
