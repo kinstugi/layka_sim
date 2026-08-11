@@ -12,6 +12,8 @@ vector -> body velocity (v, omega)) plus its LJBehavior wrapper, the
 M2.7 deterministic two-robot experiment (``run_two_robot_experiment`` /
 ``TwoRobotResult``), and the M2.8 deterministic multi-robot aggregation
 experiment (``run_aggregation_experiment`` / ``AggregationResult``).
+M2.9 adds the SEARCH <-> SWARM state-machine behavior for isolated robots
+(``SearchSwarmBehavior`` / ``SearchSwarmConfig``).
 Pure Python: no GTK/PyGObject dependency, so it imports headlessly for
 tests and experiments.
 """
@@ -45,6 +47,7 @@ from layka.neighbors import Neighbor, NeighborSensor
 from layka.pose import Pose2D, normalize_angle
 from layka.renderer import DebugRenderer, TrajectoryRecorder, heading_arrow
 from layka.robot import RobotConfig, RobotState
+from layka.search_behavior import SearchSwarmBehavior, SearchSwarmConfig
 from layka.vector import Vector2
 from layka.world import World
 
@@ -64,6 +67,8 @@ __all__ = [
     "Pose2D",
     "RobotConfig",
     "RobotState",
+    "SearchSwarmBehavior",
+    "SearchSwarmConfig",
     "SimulationClock",
     "SimulationConfig",
     "StationaryBehavior",
