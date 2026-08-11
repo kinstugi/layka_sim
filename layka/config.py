@@ -6,6 +6,8 @@ high-frequency numerical loops.
 
 from __future__ import annotations
 
+import math
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 #: 2^(1/6): factor relating the LJ zero-crossing ``sigma`` to the potential
@@ -51,12 +53,28 @@ class LennardJonesConfig(BaseModel):
         description="Interaction cutoff radius (m); None disables the cutoff.",
     )
     max_force: float = Field(default=10.0, gt=0, description="Interaction force clamp.")
+    min_distance: float = Field(
+        default=0.01,
+        gt=0,
+        description="Minimum interaction distance for numerical safety (m). "
+        "Distances below this are clamped up before evaluating the LJ "
+        "potential/force (M2.2). Must be finite and positive. The default "
+        "0.01 m is small relative to the typical desired_spacing of 0.40 m "
+        "(sigma ~= 0.3564 m).",
+    )
 
     @field_validator("cutoff_distance")
     @classmethod
     def _cutoff_must_be_positive(cls, value: float | None) -> float | None:
         if value is not None and value <= 0:
             raise ValueError("cutoff_distance must be greater than 0 when set")
+        return value
+
+    @field_validator("min_distance")
+    @classmethod
+    def _min_distance_must_be_finite_and_positive(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("min_distance must be a finite positive number")
         return value
 
     @model_validator(mode="after")

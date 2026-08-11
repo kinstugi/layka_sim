@@ -1,11 +1,12 @@
-"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6 / M1.7 / M1.8 / M2.1).
+"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6 / M1.7 / M1.8 / M2.1 / M2.2).
 
 Re-exports the public typed models, the explicit simulation clock, the
 differential-drive kinematics, the minimal robot behavior abstraction, the
 multi-robot world, the neighbor query abstraction, the minimal text-based
-debug renderer, and the pure Lennard-Jones potential/force functions. Pure
-Python: no GTK/PyGObject dependency, so it imports headlessly for tests and
-experiments.
+debug renderer, the pure Lennard-Jones potential/force functions, and the
+M2.2 numerical-safety guards (min-distance clamp, force clamp, cutoff,
+finite checks). Pure Python: no GTK/PyGObject dependency, so it imports
+headlessly for tests and experiments.
 """
 
 from layka.behavior import Behavior, StationaryBehavior, TrivialMotionBehavior
@@ -20,6 +21,7 @@ from layka.kinematics import (
     wheels_to_body,
 )
 from layka.lennard_jones import lennard_jones_force, lennard_jones_potential
+from layka.lj_safety import clamp, safe_lj_force, safe_lj_potential
 from layka.neighbors import Neighbor, NeighborSensor
 from layka.pose import Pose2D, normalize_angle
 from layka.renderer import DebugRenderer, TrajectoryRecorder, heading_arrow
@@ -47,10 +49,13 @@ __all__ = [
     "WheelSpeeds",
     "World",
     "body_to_wheels",
+    "clamp",
     "heading_arrow",
     "integrate_pose",
     "lennard_jones_force",
     "lennard_jones_potential",
     "normalize_angle",
+    "safe_lj_force",
+    "safe_lj_potential",
     "wheels_to_body",
 ]
