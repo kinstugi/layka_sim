@@ -33,6 +33,10 @@ class LennardJonesConfig(BaseModel):
     ``r_eq = 2^(1/6) * sigma``. Users who think in terms of the desired
     robot-to-robot spacing should set ``desired_spacing`` instead; ``sigma``
     is then derived internally as ``desired_spacing / 2^(1/6)``.
+
+    Example: ``desired_spacing = 0.40`` m means ``r_eq ~= 0.40`` m (with
+    ``sigma ~= 0.3564`` m), never ``sigma = 0.40`` m (which would give
+    ``r_eq ~= 0.4490`` m).
     """
 
     epsilon: float = Field(default=1.0, gt=0, description="Potential well depth.")
