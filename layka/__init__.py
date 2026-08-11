@@ -1,9 +1,9 @@
-"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6).
+"""Layka simulator core (M1.3 / M1.4 / M1.5 / M1.6 / M1.7).
 
 Re-exports the public typed models, the explicit simulation clock, the
-differential-drive kinematics, the minimal robot behavior abstraction, and
-the multi-robot world. Pure Python: no GTK/PyGObject dependency, so it
-imports headlessly for tests and experiments.
+differential-drive kinematics, the minimal robot behavior abstraction, the
+multi-robot world, and the neighbor query abstraction. Pure Python: no
+GTK/PyGObject dependency, so it imports headlessly for tests and experiments.
 """
 
 from layka.behavior import Behavior, StationaryBehavior, TrivialMotionBehavior
@@ -17,6 +17,7 @@ from layka.kinematics import (
     integrate_pose,
     wheels_to_body,
 )
+from layka.neighbors import Neighbor, NeighborSensor
 from layka.pose import Pose2D, normalize_angle
 from layka.robot import RobotConfig, RobotState
 from layka.vector import Vector2
@@ -27,6 +28,8 @@ __all__ = [
     "BodyVelocity",
     "DifferentialDriveRobot",
     "LennardJonesConfig",
+    "Neighbor",
+    "NeighborSensor",
     "Pose2D",
     "RobotConfig",
     "RobotState",
