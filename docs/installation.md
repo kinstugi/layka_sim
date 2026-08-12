@@ -1,9 +1,10 @@
 # Installation
 
-This project is a GTK3 application written in Python. It has exactly one
-runtime Python dependency — [PyGObject](https://pygobject.readthedocs.io/)
-— plus the system GTK3 libraries that PyGObject binds to. Development only
-adds `pytest`.
+This project is a GTK3 application written in Python. It has two runtime
+Python dependencies — [PyGObject](https://pygobject.readthedocs.io/) (binds
+the GTK3 UI) and [Pydantic](https://docs.pydantic.dev/) (validated
+configuration models) — plus the system GTK3 libraries that PyGObject binds
+to. Development only adds `pytest`.
 
 ## Requirements
 
