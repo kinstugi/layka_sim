@@ -23,6 +23,10 @@ M2.10 adds static circular obstacles (``Obstacle``), world storage for them
 and the ``ObstacleAvoidanceBehavior`` wrapper that overrides the inner swarm
 command with a steer-away command near an obstacle (obstacles are world
 geometry, never robots: they never enter the neighbor/LJ pipeline).
+M2.11 adds the pure, read-only swarm metrics (``mean_pairwise_distance``,
+``centroid``, ``mean_centroid_distance``, ``distance_variance``,
+``cluster_radius``, ``aggregation_score``) plus the ``positions_from_world``
+extraction helper.
 Pure Python: no GTK/PyGObject dependency, so it imports headlessly for
 tests and experiments.
 """
@@ -53,6 +57,15 @@ from layka.lj_interaction import (
     resultant_lj_force,
 )
 from layka.lj_safety import clamp, safe_lj_force, safe_lj_potential
+from layka.metrics import (
+    aggregation_score,
+    centroid,
+    cluster_radius,
+    distance_variance,
+    mean_centroid_distance,
+    mean_pairwise_distance,
+    positions_from_world,
+)
 from layka.neighbors import Neighbor, NeighborSensor
 from layka.obstacle import Obstacle
 from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
@@ -104,14 +117,21 @@ __all__ = [
     "World",
     "body_to_wheels",
     "build_frame_items",
+    "aggregation_score",
+    "centroid",
     "clamp",
+    "cluster_radius",
     "compute_sensor_readings",
+    "distance_variance",
     "heading_arrow",
     "integrate_pose",
     "lennard_jones_force",
     "lennard_jones_potential",
+    "mean_centroid_distance",
+    "mean_pairwise_distance",
     "normalize_angle",
     "pairwise_lj_force",
+    "positions_from_world",
     "resultant_lj_force",
     "run_aggregation_experiment",
     "run_two_robot_experiment",
