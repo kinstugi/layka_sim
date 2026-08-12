@@ -27,6 +27,10 @@ M2.11 adds the pure, read-only swarm metrics (``mean_pairwise_distance``,
 ``centroid``, ``mean_centroid_distance``, ``distance_variance``,
 ``cluster_radius``, ``aggregation_score``) plus the ``positions_from_world``
 extraction helper.
+M2.13 adds the pure, headless M2.13 debug overlay (``lj_debug_overlay`` /
+``LJDebugVector`` / ``scaled_vector``): per-robot world-frame LJ resultant and
+pairwise vectors, rendered by ``build_frame_items`` only when supplied (the
+overlay is disabled by default).
 Pure Python: no GTK/PyGObject dependency, so it imports headlessly for
 tests and experiments.
 """
@@ -56,6 +60,7 @@ from layka.lj_interaction import (
     pairwise_lj_force,
     resultant_lj_force,
 )
+from layka.lj_overlay import LJDebugVector, lj_debug_overlay, scaled_vector
 from layka.lj_safety import clamp, safe_lj_force, safe_lj_potential
 from layka.metrics import (
     aggregation_score,
@@ -92,6 +97,7 @@ __all__ = [
     "LJBehavior",
     "LJController",
     "LJControllerConfig",
+    "LJDebugVector",
     "LJInteraction",
     "LaykaWorldView",
     "LennardJonesConfig",
@@ -127,6 +133,7 @@ __all__ = [
     "integrate_pose",
     "lennard_jones_force",
     "lennard_jones_potential",
+    "lj_debug_overlay",
     "mean_centroid_distance",
     "mean_pairwise_distance",
     "normalize_angle",
@@ -137,5 +144,6 @@ __all__ = [
     "run_two_robot_experiment",
     "safe_lj_force",
     "safe_lj_potential",
+    "scaled_vector",
     "wheels_to_body",
 ]

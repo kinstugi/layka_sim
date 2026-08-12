@@ -23,11 +23,16 @@ What gets drawn, in order (later items on top):
   an obstacle, fading from nearly opaque to nearly transparent with distance
   (mirroring the legacy ``ProximitySensorView``); idle sensors draw a faint
   red cone;
-- each robot as a blue circle with a red heading line.
+- each robot as a blue circle with a red heading line;
+- the M2.13 LJ debug overlay (only when ``lj_overlay`` is supplied): the
+  resultant interaction vector per robot as an orange arrow and, when present,
+  per-neighbor pairwise vectors as chocolate arrows, drawn AFTER the robots so
+  they overlay them.
 
 Debug mode toggles neighbor links (and, if a trajectory recorder is present,
 trail polylines). ``detection_range`` is required for neighbor links and is
-validated to be a finite positive number when provided.
+validated to be a finite positive number when provided. The LJ-force overlay
+is DISABLED BY DEFAULT: with ``lj_overlay=None`` nothing extra is drawn.
 
 :class:`LaykaWorldView` is the thin glue that pushes the primitives produced
 by :func:`build_frame_items` into a legacy ``Viewer``'s current frame; it is
@@ -40,6 +45,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from layka.lj_overlay import LJDebugVector, scaled_vector
 from layka.neighbors import NeighborSensor
 from layka.vector import Vector2
 
@@ -62,12 +68,18 @@ TRAIL_COLOR = "steel blue"
 LINK_COLOR = "green"
 SENSOR_ROBOT_COLOR = "green"
 SENSOR_OBSTACLE_COLOR = "red"
+#: M2.13 LJ debug overlay arrow colors (both exist in gui/color_palette.py).
+RESULTANT_VECTOR_COLOR = "orange"
+PAIRWISE_VECTOR_COLOR = "chocolate"
+#: Default maximum arrow length (m) for the LJ debug overlay.
+DEFAULT_LJ_ARROW_MAX_LENGTH = 0.3
 
 GRID_LINEWIDTH = 0.005
 BOUNDARY_LINEWIDTH = 0.02
 ROBOT_LINEWIDTH = 0.015
 TRAIL_LINEWIDTH = 0.008
 LINK_LINEWIDTH = 0.01
+LJ_ARROW_LINEWIDTH = 0.015
 
 #: Alpha for a sensor cone that detects nothing (idle, faint).
 SENSOR_IDLE_ALPHA = 0.1
@@ -128,6 +140,8 @@ def build_frame_items(
     sensor_readings: dict[int, list[SensorReading]] | None = None,
     sensor_max_range: float = 0.2,
     sensor_fov: float = 0.6981317007977318,  # 40 degrees
+    lj_overlay: dict[int, list[LJDebugVector]] | None = None,
+    arrow_max_length: float = DEFAULT_LJ_ARROW_MAX_LENGTH,
 ) -> list[dict]:
     """Render a ``World`` into ``gui.Frame``-compatible drawing primitives.
 
@@ -140,6 +154,15 @@ def build_frame_items(
     ``sensor_readings`` (per-robot list of :class:`SensorReading`) adds the IR
     proximity-sensor cones; see the module docstring for the color/alpha rule.
     Cones render below the robots so the robot bodies stay visible.
+
+    ``lj_overlay`` (per-robot list of :class:`LJDebugVector`, as produced by
+    :func:`layka.lj_overlay.lj_debug_overlay`) adds the M2.13 LJ debug arrows:
+    one arrow per vector, from ``origin`` to
+    ``origin + scaled_vector(vector, arrow_max_length)``, in the same offset
+    coordinates as everything else. Resultant vectors are orange, pairwise
+    vectors chocolate; arrows render AFTER the robots so they overlay them.
+    With ``lj_overlay=None`` (the default) nothing extra is drawn -- the
+    overlay is disabled by default.
 
     ``offset`` is subtracted from every emitted coordinate. The legacy painter
     maps the metric origin ``(0, 0)`` to the center of the window, while a
@@ -158,6 +181,11 @@ def build_frame_items(
         raise ValueError(
             "detection_range must be a finite positive number, "
             f"got {detection_range!r}"
+        )
+    _validate_positive("arrow_max_length", arrow_max_length)
+    if lj_overlay is not None and not isinstance(lj_overlay, dict):
+        raise TypeError(
+            f"lj_overlay must be a dict or None, got {type(lj_overlay).__name__!r}"
         )
 
     offset_x, offset_y = offset
@@ -311,6 +339,50 @@ def build_frame_items(
             }
         )
 
+    if lj_overlay:
+        resultant_segments: list[list[list[float]]] = []
+        pairwise_segments: list[list[list[float]]] = []
+        for record in lj_overlay.values():
+            for item in record:
+                if not isinstance(item, LJDebugVector):
+                    raise TypeError(
+                        f"lj_overlay records must contain LJDebugVector, "
+                        f"got {type(item).__name__!r}"
+                    )
+                scaled = scaled_vector(item.vector, arrow_max_length)
+                segment = [
+                    _p(item.origin.x, item.origin.y),
+                    _p(item.origin.x + scaled.x, item.origin.y + scaled.y),
+                ]
+                if item.kind == "resultant":
+                    resultant_segments.append(segment)
+                elif item.kind == "pairwise":
+                    pairwise_segments.append(segment)
+                else:
+                    raise ValueError(
+                        f"unknown LJ debug vector kind: {item.kind!r}"
+                    )
+        if resultant_segments:
+            items.append(
+                {
+                    "type": "lines",
+                    "lines": resultant_segments,
+                    "linewidth": LJ_ARROW_LINEWIDTH,
+                    "color": RESULTANT_VECTOR_COLOR,
+                    "alpha": None,
+                }
+            )
+        if pairwise_segments:
+            items.append(
+                {
+                    "type": "lines",
+                    "lines": pairwise_segments,
+                    "linewidth": LJ_ARROW_LINEWIDTH,
+                    "color": PAIRWISE_VECTOR_COLOR,
+                    "alpha": None,
+                }
+            )
+
     return items
 
 
@@ -320,8 +392,9 @@ class LaykaWorldView:
     Wraps a ``World`` and a duck-typed viewer (any object exposing
     ``current_frame`` with ``add_circle``/``add_lines``/``add_polygons``).
     ``debug`` toggles neighbor links and trails; ``sensor_readings`` adds the
-    IR proximity-sensor cones; ``draw_world_to_frame`` must be called between
-    the viewer's ``new_frame()`` and ``draw_frame()`` calls.
+    IR proximity-sensor cones; ``lj_overlay`` adds the M2.13 LJ debug arrows
+    (None, the default, disables the overlay); ``draw_world_to_frame`` must be
+    called between the viewer's ``new_frame()`` and ``draw_frame()`` calls.
 
     With ``centered=True`` (default) the world is shifted so its center lands
     on the painter's origin (the window center) rather than drawing the
@@ -340,6 +413,8 @@ class LaykaWorldView:
         "_sensor_readings",
         "_sensor_max_range",
         "_sensor_fov",
+        "_lj_overlay",
+        "_arrow_max_length",
     )
 
     def __init__(
@@ -356,6 +431,8 @@ class LaykaWorldView:
         sensor_readings: dict[int, list[SensorReading]] | None = None,
         sensor_max_range: float = 0.2,
         sensor_fov: float = 0.6981317007977318,
+        lj_overlay: dict[int, list[LJDebugVector]] | None = None,
+        arrow_max_length: float = DEFAULT_LJ_ARROW_MAX_LENGTH,
     ) -> None:
         self._world = world
         self._viewer = viewer
@@ -368,6 +445,8 @@ class LaykaWorldView:
         self._sensor_readings = sensor_readings
         self._sensor_max_range = sensor_max_range
         self._sensor_fov = sensor_fov
+        self._lj_overlay = lj_overlay
+        self._arrow_max_length = arrow_max_length
 
     @property
     def world(self) -> World:
@@ -407,6 +486,15 @@ class LaykaWorldView:
     def sensor_readings(self, value: dict[int, list[SensorReading]] | None) -> None:
         self._sensor_readings = value
 
+    @property
+    def lj_overlay(self) -> dict[int, list[LJDebugVector]] | None:
+        """Per-robot M2.13 LJ debug vectors to render (settable)."""
+        return self._lj_overlay
+
+    @lj_overlay.setter
+    def lj_overlay(self, value: dict[int, list[LJDebugVector]] | None) -> None:
+        self._lj_overlay = value
+
     def draw_world_to_frame(self) -> None:
         """Add all primitives for the current world state to the viewer frame."""
         frame = self._viewer.current_frame
@@ -425,6 +513,8 @@ class LaykaWorldView:
             sensor_readings=self._sensor_readings,
             sensor_max_range=self._sensor_max_range,
             sensor_fov=self._sensor_fov,
+            lj_overlay=self._lj_overlay,
+            arrow_max_length=self._arrow_max_length,
         ):
             if item["type"] == "circle":
                 frame.add_circle(

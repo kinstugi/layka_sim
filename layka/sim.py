@@ -26,8 +26,9 @@ Run with:  ``uv run python -m layka.sim``  (requires a display).
 
 Buttons:
     Play / Stop / Step / Reset  -- standard transport controls.
-    Show Invisibles             -- toggles the neighbor-link (and trail)
-                                   debug overlay.
+    Show Invisibles             -- toggles the neighbor-link debug overlay,
+                                   the IR sensor cones, and the M2.13 LJ-force
+                                   debug arrows (resultant vectors per robot).
     Save Map / Load Map         -- not supported by the new World (no map
                                    system yet); clicking them shows a notice.
 """
@@ -58,6 +59,7 @@ import gui.viewer  # noqa: E402  (reused generic GTK chrome; display required)
 from layka.boundary import BoundaryContainmentBehavior
 from layka.config import LennardJonesConfig, SimulationConfig
 from layka.lj_controller import LJController, LJControllerConfig
+from layka.lj_overlay import lj_debug_overlay
 from layka.obstacle import Obstacle
 from layka.obstacle_avoidance import ObstacleAvoidanceBehavior
 from layka.proximity_sensor import ProximitySensorConfig, compute_sensor_readings
@@ -121,6 +123,10 @@ class LaykaSimController:
         # IR proximity sensors (ray-cast cone rendering)
         self._sensor_config = ProximitySensorConfig()
 
+        # Shared stateless LJ config: used by every robot's behavior AND by the
+        # M2.13 debug force overlay (desired robot spacing 0.40 m).
+        self._lj_config = LennardJonesConfig(desired_spacing=0.40)
+
         # start the GTK main loop
         Gtk.main()
 
@@ -149,7 +155,7 @@ class LaykaSimController:
         self.world = World(config)
         controller_config = LJControllerConfig()
         search_config = SearchSwarmConfig()
-        lj_config = LennardJonesConfig(desired_spacing=0.40)
+        lj_config = self._lj_config
         self._search_config = search_config
         for _ in range(ROBOT_COUNT):
             self.world.add_robot(
@@ -259,7 +265,9 @@ class LaykaSimController:
     def draw_world(self) -> None:
         self.viewer.new_frame()
         # The legacy "Show Invisibles" button doubles as the debug toggle: it
-        # reveals BOTH the neighbor-link overlay and the IR sensor cones.
+        # reveals the neighbor-link overlay, the IR sensor cones, AND the
+        # M2.13 LJ-force debug arrows. With the toggle off, all three are
+        # disabled (the overlay is disabled by default).
         debug = self.viewer.show_invisibles
         self.world_view.debug = debug
         if debug:
@@ -267,8 +275,16 @@ class LaykaSimController:
             self.world_view.sensor_readings = compute_sensor_readings(
                 self.world, self._sensor_config
             )
+            # Fresh LJ debug arrows so the resultant vectors track the world.
+            self.world_view.lj_overlay = lj_debug_overlay(
+                self.world,
+                self._lj_config,
+                self._search_config.detection_range,
+                pairwise=False,
+            )
         else:
             self.world_view.sensor_readings = None
+            self.world_view.lj_overlay = None
         self.world_view.draw_world_to_frame()
         self.viewer.draw_frame()
 
