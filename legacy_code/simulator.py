@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+
+import math
+import os
+import sys
+
+# The legacy modules use absolute imports (``from models...``, ``import
+# gui...``); make this directory the import root so the moved code still runs.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+from gi.repository import GLib
+import gui.frame
+import gui.viewer
+from models.map_manager import MapManager
+from models.robot import Robot
+from models.world import World
+from views.world_view import WorldView
+from sim_exceptions.collision_exception import CollisionException
+from sim_exceptions.goal_reached_exception import GoalReachedException
+
+#custom imports
+from models.custom_robots.layka import Layka
+from models.custom_robots.test_robot import Testbot
+from utils.math_util import generate_random_robot_poses
+
+REFRESH_RATE = 20.0  # hertz
+test_poses = [(0.12, 0, math.pi), (-0.20, 0, 0) ] #(0, 0.2, 0) (0, -0.21, 0.1)
+
+
+class Simulator:
+    """
+    This class implements a robot simulator using GTK+ and custom robot classes.
+
+    It provides functionalities to:
+     - Create and manage the graphical user interface (GUI) for visualization.
+     - Load and manipulate the map environment for the simulation.
+     - Create and control robot instances with custom behaviors.
+     - Run the simulation loop, stepping through simulation ticks and updating the world state.
+     - Handle collisions and goal achievements during simulation.
+
+    """
+    def __init__(self):
+        # create the GUI
+        self.viewer = gui.viewer.Viewer(self)
+
+        # create the map manager
+        self.map_manager = MapManager()
+
+        # timing control
+        self.period = 1.0 / REFRESH_RATE  # seconds
+
+        # Gtk simulation event source - for simulation control
+        self.sim_event_source = GLib.idle_add(
+            self.initialize_sim, True
+        )  # we use this opportunity to initialize the sim
+
+        # start Gtk
+        Gtk.main()
+
+    def initialize_sim(self, random=False):
+        # reset the viewer
+        self.viewer.control_panel_state_init()
+
+        # create the simulation world
+        self.world = World(self.period)
+
+        # create the robots
+        robots = [Layka(initial_pose=pose) for pose in generate_random_robot_poses(10, 0.3)]
+        # robots = [Layka(initial_pose=pose) for pose in test_poses ]
+
+        for robot in robots:
+            self.world.add_robot(robot)
+
+        # generate a random environment
+        if random:
+            self.map_manager.random_map(self.world)
+        else:
+            self.map_manager.apply_to_world(self.world)
+
+        # create the world view
+        self.world_view = WorldView(self.world, self.viewer)
+
+        # render the initial world
+        self.draw_world()
+        
+
+    def play_sim(self):
+        GLib.source_remove(
+            self.sim_event_source
+        )  # this ensures multiple calls to play_sim do not speed up the simulator
+        self._run_sim()
+        self.viewer.control_panel_state_playing()
+
+    def pause_sim(self):
+        GLib.source_remove(self.sim_event_source)
+        self.viewer.control_panel_state_paused()
+
+    def step_sim_once(self):
+        self.pause_sim()
+        self._step_sim()
+
+    def end_sim(self, alert_text=""):
+        GLib.source_remove(self.sim_event_source)
+        self.viewer.control_panel_state_finished(alert_text)
+
+    def reset_sim(self):
+        self.pause_sim()
+        self.initialize_sim()
+
+    def save_map(self, filename):
+        self.map_manager.save_map(filename)
+
+    def load_map(self, filename):
+        self.map_manager.load_map(filename)
+        self.reset_sim()
+
+    def random_map(self):
+        self.pause_sim()
+        self.initialize_sim(random=True)
+
+    def draw_world(self):
+        self.viewer.new_frame()  # start a fresh frame
+        self.world_view.draw_world_to_frame()  # draw the world onto the frame
+        self.viewer.draw_frame()  # render the frame
+
+    def _run_sim(self):
+        self.sim_event_source = GLib.timeout_add(int(self.period * 1000), self._run_sim)
+        self._step_sim()
+
+    def _step_sim(self):
+        # increment the simulation
+        try:
+            self.world.step()
+        except CollisionException:
+            self.end_sim("Collision!")
+        except GoalReachedException:
+            self.end_sim("Goal Reached!")
+
+        # draw the resulting world
+        self.draw_world()
+
+
+# RUN THE SIM:
+if __name__ == "__main__":
+    Simulator()

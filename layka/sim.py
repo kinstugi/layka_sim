@@ -34,13 +34,25 @@ Buttons:
 
 from __future__ import annotations
 
+import os
 import random as _random
+import sys
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib
 from gi.repository import Gtk
+
+# The new simulator reuses the generic legacy GUI chrome (buttons/window/cairo
+# painter), which now lives at legacy_code/gui. Add legacy_code to sys.path so
+# ``import gui.viewer`` resolves both from ``python simulator.py`` and from
+# ``python -m layka.sim`` (the root launcher also adds it, idempotently).
+_LEGACY_CODE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "legacy_code"
+)
+if os.path.isdir(_LEGACY_CODE) and _LEGACY_CODE not in sys.path:
+    sys.path.insert(0, _LEGACY_CODE)
 
 import gui.viewer  # noqa: E402  (reused generic GTK chrome; display required)
 from layka.boundary import BoundaryContainmentBehavior

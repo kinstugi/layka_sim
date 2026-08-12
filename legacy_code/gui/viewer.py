@@ -228,7 +228,7 @@ class Viewer:
             ),
         )
         file_chooser.set_do_overwrite_confirmation(True)
-        file_chooser.set_current_folder("maps")
+        file_chooser.set_current_folder("legacy_code/maps")
 
         # run the file chooser dialog
         response_id = file_chooser.run()
@@ -253,7 +253,7 @@ class Viewer:
                 LS_DIALOG_RESPONSE_ACCEPT,
             ),
         )
-        file_chooser.set_current_folder("maps")
+        file_chooser.set_current_folder("legacy_code/maps")
 
         # run the file chooser dialog
         response_id = file_chooser.run()

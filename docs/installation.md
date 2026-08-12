@@ -71,13 +71,20 @@ pytest
 
 ## Notes
 
-- The legacy code imports only the Python standard library plus PyGObject
-  (`import gi`); there is no numpy/pydantic dependency at this stage.
+- `python simulator.py` runs the **new `layka` simulator** (search + LJ swarm
+  aggregation + IR-sensor obstacle avoidance). The generic GTK window/buttons
+  are reused from `legacy_code/gui`, which is why the launcher and
+  `layka/sim.py` add `legacy_code` to `sys.path`.
+- The **legacy** Sobot-Rimulator code is preserved untouched under
+  `legacy_code/` and can be launched with
+  `uv run python legacy_code/simulator.py`.
+- The new `layka` package imports only the Python standard library plus
+  PyGObject (`import gi`) and Pydantic; it has no numpy dependency.
 - `simulator.py` must be run from the repository root; the legacy modules
-  (`gui/`, `models/`, `views/`, `utils/`, ...) are imported by path and are
-  not installed as a package.
+  (`legacy_code/gui/`, `legacy_code/models/`, ...) are imported by path and
+  are not installed as a package.
 - Headless limitation: `python simulator.py` fails without a display
-  (`gui/viewer.py` checks `Gdk.Display.get_default()` and exits at import
-  time). This is a known blocker documented in
+  (`legacy_code/gui/viewer.py` checks `Gdk.Display.get_default()` and exits
+  at import time). This is a known blocker documented in
   `docs/current_architecture.md`; the tests deliberately avoid importing
   `gi` so they run anywhere.

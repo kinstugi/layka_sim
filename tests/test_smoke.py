@@ -3,12 +3,20 @@
 Deliberately dependency-light: these exercise only pure, stdlib-only
 functions from the legacy codebase so `pytest` collects and passes without
 GTK/PyGObject installed. Do not add `gi` or other heavy imports here.
+
+The legacy math utilities moved to ``legacy_code/utils`` when the old
+implementation was relocated; this test still exercises them via a path shim
+(pytest also uses this to prove the harness works regardless of the GUI).
 """
 
+import os
+import sys
 from math import atan2, isclose, pi
 
-from utils.linalg2_util import distance, mag, rotate_vector, unit
-from utils.math_util import cartesian_to_polar, normalize_angle
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "legacy_code"))
+
+from utils.linalg2_util import distance, mag, rotate_vector, unit  # noqa: E402
+from utils.math_util import cartesian_to_polar, normalize_angle  # noqa: E402
 
 
 def test_normalize_angle_maps_to_minus_pi_to_pi():

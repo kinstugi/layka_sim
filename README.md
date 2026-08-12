@@ -30,16 +30,23 @@ and how to run the tests.
 
 ### Running the Simulator
 
-From the command line, navigate to the project's root directory. Then type:
+The default simulator is the **new ``layka`` implementation** (search +
+Lennard-Jones swarm aggregation + IR-sensor obstacle avoidance). From the
+command line, navigate to the project's root directory. Then type:
 
 ```
 uv run python simulator.py
 ```
 
-(or `python simulator.py` inside an activated virtual environment).
+(or `python simulator.py` inside an activated virtual environment, or
+`uv run python -m layka.sim`).
 
 Note: the simulator is a GTK application and requires a display; without one
 it exits at startup. The test suite does not require a display.
+
+> The original (legacy) Sobot-Rimulator code is preserved under
+> `legacy_code/` and can still be launched with
+> `uv run python legacy_code/simulator.py`.
 
 ## User Interface
 
