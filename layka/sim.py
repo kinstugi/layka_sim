@@ -258,12 +258,17 @@ class LaykaSimController:
 
     def draw_world(self) -> None:
         self.viewer.new_frame()
-        # The legacy "Show Invisibles" button doubles as the debug toggle.
-        self.world_view.debug = self.viewer.show_invisibles
-        # Fresh IR sensor readings so the red/green cones track the world.
-        self.world_view.sensor_readings = compute_sensor_readings(
-            self.world, self._sensor_config
-        )
+        # The legacy "Show Invisibles" button doubles as the debug toggle: it
+        # reveals BOTH the neighbor-link overlay and the IR sensor cones.
+        debug = self.viewer.show_invisibles
+        self.world_view.debug = debug
+        if debug:
+            # Fresh IR sensor readings so the red/green cones track the world.
+            self.world_view.sensor_readings = compute_sensor_readings(
+                self.world, self._sensor_config
+            )
+        else:
+            self.world_view.sensor_readings = None
         self.world_view.draw_world_to_frame()
         self.viewer.draw_frame()
 
