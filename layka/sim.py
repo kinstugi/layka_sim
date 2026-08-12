@@ -63,7 +63,10 @@ WORLD_WIDTH = 5.0
 WORLD_HEIGHT = 5.0
 DEFAULT_SEED = 42
 BOUNDARY_MARGIN = 0.3  # m from each edge that triggers containment
-OBSTACLE_CLEARANCE = 0.15  # m beyond an obstacle's radius that triggers avoidance
+#: Fraction of the IR sensor max_range at which an obstacle triggers avoidance.
+#: 0.9 = a 0.18 m reaction distance: the robot veers around the obstacle
+#: before committing to it, which keeps the swarm's aggregation intact.
+OBSTACLE_TRIGGER_DELTA = 0.9
 
 
 def _default_obstacles() -> list[Obstacle]:
@@ -201,7 +204,8 @@ class LaykaSimController:
         avoidance = ObstacleAvoidanceBehavior(
             inner,
             LJController(controller_config),
-            clearance=OBSTACLE_CLEARANCE,
+            self._sensor_config,
+            trigger_delta=OBSTACLE_TRIGGER_DELTA,
         )
         return BoundaryContainmentBehavior(
             avoidance,

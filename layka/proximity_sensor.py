@@ -148,18 +148,28 @@ def _sensor_global_pose(
 
 
 def compute_sensor_readings(
-    world: World, config: ProximitySensorConfig
+    world: World,
+    config: ProximitySensorConfig,
+    *,
+    robot_id: int | None = None,
 ) -> dict[int, list[SensorReading]]:
-    """Ray-cast every sensor of every robot and return per-robot readings.
+    """Ray-cast sensors and return per-robot readings.
 
     For each robot, each sensor's ray is tested against all static obstacles
     (circle radius = obstacle radius) and all *other* robots (disc radius =
     ``config.robot_radius``). The closest hit wins and determines whether the
     sensor is detecting a robot (green) or an obstacle (red). A sensor never
     detects its own robot. Pure read: does not mutate the world or robots.
+
+    With ``robot_id`` set, only that robot's readings are computed (a robot's
+    sensors depend only on its own pose); the result is a single-entry dict.
+    Behaviors should use this so per-step sensor work stays O(N) per robot.
     """
     readings: dict[int, list[SensorReading]] = {}
-    for robot in world.robots:
+    robots = (
+        [world.robot_by_id(robot_id)] if robot_id is not None else list(world.robots)
+    )
+    for robot in robots:
         robot_readings: list[SensorReading] = []
         for index, relative in enumerate(config.sensor_poses):
             sensor_pose = _sensor_global_pose(robot.pose, relative)

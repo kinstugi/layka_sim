@@ -1,4 +1,4 @@
-"""M2.10 tests: static circular obstacles, world storage, and avoidance.
+"""M2.10 tests: static circular obstacles, world storage, and IR-sensor avoidance.
 
 Covers the plan.md M2.10 requirements:
 
@@ -6,10 +6,14 @@ Covers the plan.md M2.10 requirements:
   positive finite radius; invalid radii raise ``ValueError``.
 * **World storage**: ``add_obstacle`` / ``obstacles`` (immutable snapshot) /
   ``obstacle_count``; obstacles never change robot behavior or ``step()``.
-* **Avoidance behavior**: ``ObstacleAvoidanceBehavior`` overrides the inner
-  command with a steer-away command when the robot is within
-  ``radius + clearance``; the closest obstacle wins; ``clearance=0`` triggers
-  only inside the radius; deterministic and side-effect free.
+* **Avoidance behavior**: ``ObstacleAvoidanceBehavior`` is driven by the IR
+  proximity sensors (the same ray-cast readings the renderer draws as red /
+  green cones) rather than analytic distance. An obstacle-detecting (RED)
+  sensor within ``trigger_delta * max_range`` overrides the inner command
+  with a steer-away command; a robot-detecting (GREEN) sensor NEVER triggers
+  avoidance (the swarm behavior handles robot-robot spacing via LJ
+  repulsion); otherwise it delegates. Closer obstacles contribute larger
+  repulsive vectors.
 * **An obstacle is NOT a robot**: it never appears in ``NeighborSensor``
   results and never changes LJ/search commands when avoidance is not involved.
 * **Acceptance criterion** (the key integration test): 10 robots on
@@ -19,21 +23,17 @@ Covers the plan.md M2.10 requirements:
   step, initial configuration included), and the run is deterministic.
 
 Empirical acceptance numbers (seed 42, 5 x 5 m world, dt = 0.05,
-detection_range = 2.0, cluster_radius = 1.0, 2000 steps):
+detection_range = 2.0, cluster_radius = 1.0, trigger_delta = 0.9, 2000 steps):
+final mean pairwise distance ~0.67 m, cluster fraction 1.00, and the minimum
+obstacle clearance over the whole run ~0.20 m (robots never get within the
+obstacle radius; the IR-sensor avoidance keeps them out). With the legacy
+trigger (0.75) the avoidance fires too late and disrupts aggregation, so the
+default reaction distance is 0.9 * max_range.
 
-* initial mean pairwise distance: 2.936 m (the seeded random spread);
-* final mean pairwise distance: 0.713 m (clearly aggregated);
-* final cluster fraction: 1.00 (all 10 robots within 1.0 m of the centroid);
-* min obstacle clearance over the whole run: 0.145 m (robots never get within
-  the obstacle radius; the avoidance override, triggered 38 times during the
-  run, keeps them out).
-
-Obstacle placement was tuned empirically: the plan's example placement
-((1.5, 1.5, r=0.4), (3.5, 3.5, r=0.5), (2.5, 1.0, r=0.3)) puts a robot INSIDE
-the (2.5, 1.0) obstacle at the seed-42 spawn and splits the swarm into two
-clusters, so the acceptance test uses obstacles at the left/right mid-height
-(1.0, 2.5) and (4.2, 2.5) -- placed "to the side" so aggregation is preserved
-while search patrol paths still encounter them.
+Obstacle placement was tuned empirically (see the module docstring in
+``layka/sim.py``): the plan's sketch placement puts a robot INSIDE the
+(2.5, 1.0) obstacle at the seed-42 spawn and splits the swarm, so the
+acceptance test uses obstacles at the left/right mid-height.
 """
 
 from __future__ import annotations
@@ -53,6 +53,7 @@ from layka import (
     Obstacle,
     ObstacleAvoidanceBehavior,
     Pose2D,
+    ProximitySensorConfig,
     SearchSwarmBehavior,
     SearchSwarmConfig,
     SimulationConfig,
@@ -62,7 +63,12 @@ from layka import (
     World,
 )
 
-CLEARANCE = 0.15
+DEFAULT_SENSOR_CONFIG = ProximitySensorConfig()
+FRONT_SENSOR_CONFIG = ProximitySensorConfig(sensor_poses=[(0.07, 0.0, 0.0)])
+BOTTOM_SENSOR_CONFIG = ProximitySensorConfig(
+    sensor_poses=[(0.019, -0.064, -math.pi / 2.0)]
+)
+TRIGGER_DELTA = 0.9
 
 #: Obstacles used by the acceptance scenario (tuned for seed 42, see module
 #: docstring): placed to the sides so the swarm aggregates while search
@@ -87,11 +93,17 @@ def _inner() -> TrivialMotionBehavior:
     return TrivialMotionBehavior(v=0.1, omega=0.3)
 
 
-def _avoidance(inner=None, controller=None, clearance: float = CLEARANCE):
+def _avoidance(
+    inner=None,
+    controller=None,
+    sensor_config: ProximitySensorConfig = DEFAULT_SENSOR_CONFIG,
+    trigger_delta: float = TRIGGER_DELTA,
+):
     return ObstacleAvoidanceBehavior(
         inner if inner is not None else _inner(),
         controller if controller is not None else _controller(),
-        clearance=clearance,
+        sensor_config,
+        trigger_delta=trigger_delta,
     )
 
 
@@ -192,28 +204,53 @@ class TestWorldObstacles:
         ]
 
 
-# --- Avoidance behavior ---
+# --- IR-sensor-driven avoidance behavior ---
 
 
 class TestAvoidanceDelegation:
-    def test_delegates_when_far_from_all_obstacles(self):
+    def test_delegates_when_obstacle_beyond_sensor_range(self):
         world = World(timestep=0.05)
-        world.add_obstacle(Obstacle(Vector2(2.0, 2.0), 0.4))
-        robot = _robot(world, 4.0, 4.0)  # 2.83 m from center > 0.4 + 0.15
-        behavior = _avoidance()
-        assert behavior.compute_command(robot, world, 0.05) == BodyVelocity(v=0.1, omega=0.3)
+        world.add_obstacle(Obstacle(Vector2(0.5, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
+        # Front sensor max range is 0.2 m; the obstacle at 0.5 m is unseen.
+        assert behavior.compute_command(robot, world, 0.05) == BodyVelocity(
+            v=0.1, omega=0.3
+        )
+
+    def test_delegates_when_detected_but_beyond_trigger(self):
+        world = World(timestep=0.05)
+        # Obstacle surface at 0.26 m -> ray hit 0.19 m = delta 0.95 >= 0.75.
+        world.add_obstacle(Obstacle(Vector2(0.28, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
+        assert behavior.compute_command(robot, world, 0.05) == BodyVelocity(
+            v=0.1, omega=0.3
+        )
 
     def test_delegates_stationary_inner_unchanged(self):
         world = World(timestep=0.05)
-        world.add_obstacle(Obstacle(Vector2(2.0, 2.0), 0.4))
-        robot = _robot(world, 4.0, 4.0)
+        world.add_obstacle(Obstacle(Vector2(0.5, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
         behavior = _avoidance(inner=StationaryBehavior())
         assert behavior.compute_command(robot, world, 0.05) == BodyVelocity(0.0, 0.0)
 
+    def test_robot_detection_never_triggers_avoidance(self):
+        # A front IR sensor detecting ANOTHER ROBOT (green cone) must NOT
+        # trigger obstacle avoidance -- the swarm behavior handles robot-robot
+        # spacing. The obstacle-avoidance override must delegate.
+        world = World(timestep=0.05)
+        _robot(world, 0.15, 0.0)  # second robot directly ahead
+        robot = _robot(world, 0.0, 0.0)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
+        assert behavior.compute_command(robot, world, 0.05) == BodyVelocity(
+            v=0.1, omega=0.3
+        )
+
     def test_inner_is_not_called_while_override_active(self):
         world = World(timestep=0.05)
-        world.add_obstacle(Obstacle(Vector2(2.0, 2.0), 0.4))
-        robot = _robot(world, 2.2, 2.0)  # within radius + clearance
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
 
         class CountingBehavior:
             def __init__(self):
@@ -224,97 +261,102 @@ class TestAvoidanceDelegation:
                 return BodyVelocity(v=0.1, omega=0.3)
 
         counting = CountingBehavior()
-        behavior = ObstacleAvoidanceBehavior(counting, _controller())
+        behavior = ObstacleAvoidanceBehavior(
+            counting, _controller(), FRONT_SENSOR_CONFIG
+        )
         behavior.compute_command(robot, world, 0.05)
         assert counting.calls == 0  # override path never touches the inner
 
 
 class TestAvoidanceOverride:
-    def test_override_steers_away_within_influence(self):
+    def test_front_obstacle_steers_away(self):
         world = World(timestep=0.05)
-        obstacle = Obstacle(Vector2(2.0, 2.0), 0.4)
-        world.add_obstacle(obstacle)
-        # robot at (2.3, 2.0): center distance 0.3 < 0.4 + 0.15 = 0.55
-        robot = _robot(world, 2.3, 2.0, theta=0.0)
+        # Obstacle dead ahead at 0.15 m: front sensor origin at 0.07 m, ray hit
+        # at 0.06 m -> delta 0.3 -> weight 0.75-0.3 = 0.45, away vector (-1, 0).
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0, theta=0.0)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
+        command = behavior.compute_command(robot, world, 0.05)
+        # Facing straight into the obstacle: it must stop and turn around
+        # (omega = +max, v = 0 because cos(error) <= 0 at error = pi).
+        assert command == BodyVelocity(v=0.0, omega=1.0)
+        assert command != BodyVelocity(v=0.1, omega=0.3)
+
+    def test_front_obstacle_command_matches_controller_on_away_vector(self):
+        world = World(timestep=0.05)
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0, theta=0.0)
         controller = _controller()
-        behavior = _avoidance(controller=controller)
+        behavior = _avoidance(controller=controller, sensor_config=FRONT_SENSOR_CONFIG)
+        command = behavior.compute_command(robot, world, 0.05)
+        # The avoidance vector points AWAY from the detected surface (hit
+        # point at x=0.13, robot at x=0), i.e. along -x; the controller's
+        # atan2 direction is what matters, so any -x vector maps to the same
+        # turn-around command.
+        assert command == controller.compute(Vector2(-1.0, 0.0), 0.0)
+        assert command.v == 0.0
+        assert command.omega > 0.0
+
+    def test_side_obstacle_steers_away_from_that_side(self):
+        world = World(timestep=0.05)
+        # Obstacle below the robot; the bottom sensor (facing -y) detects it,
+        # so the robot must steer upward (away from the obstacle).
+        world.add_obstacle(Obstacle(Vector2(0.0, -0.15), 0.02))
+        robot = _robot(world, 0.0, 0.0, theta=0.0)
+        behavior = _avoidance(sensor_config=BOTTOM_SENSOR_CONFIG)
         command = behavior.compute_command(robot, world, 0.05)
         assert command != BodyVelocity(v=0.1, omega=0.3)
-        expected = controller.compute(
-            robot.pose.position() - obstacle.center, robot.pose.theta
-        )
-        assert command == expected
-        # away = (+0.3, 0.0), robot already faces +x: it should drive forward
-        # (omega ~ 0), never toward the obstacle center.
-        assert command.v >= 0.0
-        assert abs(command.omega) < 1e-9
+        assert command.omega > 0.0  # turning up / away from the below obstacle
 
-    def test_override_reversal_heading_turns_away_from_obstacle(self):
+    def test_trigger_delta_threshold(self):
         world = World(timestep=0.05)
-        obstacle = Obstacle(Vector2(2.0, 2.0), 0.4)
-        world.add_obstacle(obstacle)
-        # robot west of the obstacle facing STRAIGHT INTO it (heading +x, i.e.
-        # toward the obstacle center at (2.0, 2.0)); the override must turn it
-        # around: away vector points -x, desired heading pi, error pi -> omega
-        # > 0 (CCW turn per the math convention).
-        robot = _robot(world, 1.7, 2.0, theta=0.0)
-        behavior = _avoidance()
-        command = behavior.compute_command(robot, world, 0.05)
-        assert command.omega > 0.0  # turning away from the obstacle
-
-    def test_closest_obstacle_wins(self):
-        world = World(timestep=0.05)
-        near = Obstacle(Vector2(2.0, 2.0), 0.3)
-        far = Obstacle(Vector2(2.6, 2.0), 0.3)
-        world.add_obstacle(near)
-        world.add_obstacle(far)
-        # robot at (2.2, 2.0): 0.2 from near, 0.4 from far, both < 0.45
-        robot = _robot(world, 2.2, 2.0, theta=0.0)
-        controller = _controller()
-        behavior = _avoidance(controller=controller)
-        command = behavior.compute_command(robot, world, 0.05)
-        assert command == controller.compute(
-            robot.pose.position() - near.center, robot.pose.theta
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
+        # delta 0.3 >= trigger 0.2 -> no avoidance, delegate.
+        relaxed = _avoidance(
+            sensor_config=FRONT_SENSOR_CONFIG, trigger_delta=0.2
         )
-        # and NOT the far obstacle's away vector
-        assert command != controller.compute(
-            robot.pose.position() - far.center, robot.pose.theta
+        assert relaxed.compute_command(robot, world, 0.05) == BodyVelocity(
+            v=0.1, omega=0.3
+        )
+        # delta 0.3 < trigger 0.75 -> avoid.
+        strict = _avoidance(
+            sensor_config=FRONT_SENSOR_CONFIG, trigger_delta=0.75
+        )
+        assert strict.compute_command(robot, world, 0.05) != BodyVelocity(
+            v=0.1, omega=0.3
         )
 
-    def test_zero_clearance_triggers_only_inside_the_radius(self):
+    def test_closest_obstacle_along_ray_determines_detection(self):
         world = World(timestep=0.05)
-        obstacle = Obstacle(Vector2(2.0, 2.0), 0.4)
-        world.add_obstacle(obstacle)
-        controller = _controller()
-        behavior = _avoidance(controller=controller, clearance=0.0)
-        # 0.3 < 0.4: inside the radius -> override
-        robot_in = _robot(world, 2.3, 2.0, theta=0.0)
-        assert behavior.compute_command(robot_in, world, 0.05) == controller.compute(
-            Vector2(0.3, 0.0), 0.0
-        )
-        # 0.5 >= 0.4: outside -> delegate
-        robot_out = _robot(world, 2.5, 2.0, theta=0.0)
-        assert behavior.compute_command(robot_out, world, 0.05) == BodyVelocity(
+        # Two obstacles along the front ray; the closer one (0.15) makes the
+        # sensor report delta 0.3 (triggering), while the farther one alone
+        # (delta 0.95) would not. Closest wins => override happens.
+        world.add_obstacle(Obstacle(Vector2(0.28, 0.0), 0.02))
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
+        assert behavior.compute_command(robot, world, 0.05) != BodyVelocity(
             v=0.1, omega=0.3
         )
 
     def test_determinism(self):
         world = World(timestep=0.05)
-        world.add_obstacle(Obstacle(Vector2(2.0, 2.0), 0.4))
-        robot = _robot(world, 2.2, 2.0, theta=0.5)
-        behavior = _avoidance()
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0, theta=0.5)
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
         first = behavior.compute_command(robot, world, 0.05)
         second = behavior.compute_command(robot, world, 0.05)
         assert first == second
 
     def test_no_mutation_of_robot_or_world(self):
         world = World(timestep=0.05)
-        world.add_obstacle(Obstacle(Vector2(2.0, 2.0), 0.4))
-        robot = _robot(world, 2.2, 2.0, theta=0.5)
+        world.add_obstacle(Obstacle(Vector2(0.15, 0.0), 0.02))
+        robot = _robot(world, 0.0, 0.0, theta=0.5)
         pose_before = robot.pose
         velocity_before = (robot.linear_velocity, robot.angular_velocity)
         time_before = world.time
-        behavior = _avoidance()
+        behavior = _avoidance(sensor_config=FRONT_SENSOR_CONFIG)
         behavior.compute_command(robot, world, 0.05)
         assert robot.pose == pose_before
         assert (robot.linear_velocity, robot.angular_velocity) == velocity_before
@@ -322,20 +364,31 @@ class TestAvoidanceOverride:
 
 
 class TestAvoidanceValidation:
-    def test_invalid_clearance(self):
-        for bad in (-0.1, math.nan, math.inf):
-            with pytest.raises(ValueError):
-                ObstacleAvoidanceBehavior(_inner(), _controller(), clearance=bad)
+    @pytest.mark.parametrize("delta", [0.0, -0.1, math.nan, math.inf, 1.5])
+    def test_invalid_trigger_delta(self, delta):
+        with pytest.raises(ValueError):
+            ObstacleAvoidanceBehavior(
+                _inner(), _controller(), DEFAULT_SENSOR_CONFIG, trigger_delta=delta
+            )
+
+    def test_wrong_sensor_config_type(self):
+        with pytest.raises(TypeError):
+            ObstacleAvoidanceBehavior(_inner(), _controller(), "not a config")  # type: ignore[arg-type]
 
     def test_read_only_properties(self):
         inner = _inner()
         controller = _controller()
-        behavior = ObstacleAvoidanceBehavior(inner, controller, clearance=0.2)
+        behavior = ObstacleAvoidanceBehavior(
+            inner, controller, DEFAULT_SENSOR_CONFIG, trigger_delta=0.6
+        )
         assert behavior.inner is inner
         assert behavior.controller is controller
-        assert behavior.clearance == 0.2
+        assert behavior.sensor_config is DEFAULT_SENSOR_CONFIG
+        assert behavior.trigger_delta == 0.6
         with pytest.raises(AttributeError):
-            behavior.clearance = 0.5  # type: ignore[misc]
+            behavior.trigger_delta = 0.5  # type: ignore[misc]
+        with pytest.raises(AttributeError):
+            behavior.sensor_config = DEFAULT_SENSOR_CONFIG  # type: ignore[misc]
 
 
 # --- An obstacle is NOT a robot ---
@@ -417,12 +470,16 @@ def _make_acceptance_world(seed: int = 42) -> World:
     controller_config = LJControllerConfig()
     search_config = SearchSwarmConfig()
     lj_config = LennardJonesConfig(desired_spacing=0.40)
+    sensor_config = ProximitySensorConfig()
     for _ in range(10):
         inner = SearchSwarmBehavior.from_config(
             search_config, controller_config, lj_config
         )
         avoidance = ObstacleAvoidanceBehavior(
-            inner, LJController(controller_config), clearance=CLEARANCE
+            inner,
+            LJController(controller_config),
+            sensor_config,
+            trigger_delta=TRIGGER_DELTA,
         )
         world.add_robot(
             behavior=BoundaryContainmentBehavior(
@@ -486,11 +543,9 @@ class TestAcceptanceCriterion:
         for position in positions:
             assert math.isfinite(position.x)
             assert math.isfinite(position.y)
-        # The swarm aggregated: empirically 1.00 with the tuned obstacles;
-        # assert with a margin (0.7 = a clear majority within 1.0 m).
+        # The swarm aggregated (assert a clear majority within 1.0 m).
         assert _cluster_fraction(positions) >= 0.7
-        # Mean pairwise distance dropped clearly below the initial spread
-        # (2.936 m for the seed-42 placement; empirically 0.713 at the end).
+        # Mean pairwise distance dropped clearly below the initial spread.
         assert _mean_pairwise_distance(positions) < 1.5
         assert _mean_pairwise_distance(positions) < INITIAL_SPREAD
 
